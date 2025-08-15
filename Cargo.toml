@@ -1,0 +1,19 @@
+[package]
+name = "qxauto"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["cargo"] }
+#screenshots = "0.8.10"
+enigo = "0.5.0"
+env_logger = "0.11"
+find-subimage = { path = "../find-subimage", features = ["opencv"] }
+log = "0.4"
+sysinfo = "0.37.0"
+#tokio = { version = "1", features = ["full"] }
+toml = "0.9"
+xcap = "0.6"
+image = "0.25.6"
+opencv = { version = "0.95.1", features = ["clang-runtime"] }
