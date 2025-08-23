@@ -6,7 +6,7 @@ use sysinfo::{Pid, Process};
 
 use crate::{CheckResult, SearchResult, check_image_match, definitions::PROCESS_NAME};
 
-const MATCH_TEMPLATE: &[Rgb<u8>] = &[Rgb([52, 182, 81])];
+const MATCH_TEMPLATE: &[Rgb<u8>] = &[Rgb([52, 182, 81]), Rgb([58, 198, 90])];
 
 #[must_use]
 pub(crate) fn check_primary_exec(process: &HashMap<Pid, Process>) -> CheckResult {
@@ -21,6 +21,7 @@ pub(crate) fn handle_target() -> anyhow::Result<bool> {
         log::trace!("{pos1} {pos2}");
         let mut eg = enigo::Enigo::new(&enigo::Settings::default())?;
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
+        eg.button(enigo::Button::Left, enigo::Direction::Click)?;
     }
 
     Ok(false)
