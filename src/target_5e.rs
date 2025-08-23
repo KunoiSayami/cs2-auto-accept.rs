@@ -25,7 +25,7 @@ mod target {
     }
 
     pub(crate) fn handle_target() -> anyhow::Result<bool> {
-        let image = screen_cap()?;
+        /* let image = screen_cap()?; */
         Ok(false)
     }
 

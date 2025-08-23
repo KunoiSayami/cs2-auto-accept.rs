@@ -1,12 +1,12 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::collections::HashMap;
 
+use enigo::Mouse;
+use image::Rgb;
 use sysinfo::{Pid, Process};
 
-use crate::{
-    CheckResult, SubImageType, definitions::PROCESS_NAME, find_match_sub_image, load_image,
-};
+use crate::{CheckResult, SearchResult, check_image_match, definitions::PROCESS_NAME};
 
-static SUB_IMAGE: OnceLock<SubImageType> = OnceLock::new();
+const MATCH_TEMPLATE: &[Rgb<u8>] = &[Rgb([52, 182, 81])];
 
 #[must_use]
 pub(crate) fn check_primary_exec(process: &HashMap<Pid, Process>) -> CheckResult {
@@ -17,14 +17,10 @@ pub(crate) fn check_primary_exec(process: &HashMap<Pid, Process>) -> CheckResult
 }
 
 pub(crate) fn handle_target() -> anyhow::Result<bool> {
-    if SUB_IMAGE.get().is_none() {
-        let image = load_image("cs2.png")?;
-        SUB_IMAGE.set(image.into_raw()).unwrap();
-    }
-    let sub_image = SUB_IMAGE.get().unwrap();
-
-    if let Some((pos1, pos2, trust_factor)) = find_match_sub_image(sub_image)? {
-        log::trace!("{pos1} {pos2} {trust_factor:.2}");
+    if let SearchResult::Found(pos1, pos2) = check_image_match(None, false, MATCH_TEMPLATE)? {
+        log::trace!("{pos1} {pos2}");
+        let mut eg = enigo::Enigo::new(&enigo::Settings::default())?;
+        eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
     }
 
     Ok(false)
