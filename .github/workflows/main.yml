@@ -1,0 +1,70 @@
+name: Build Releases
+
+on:
+  push:
+
+  workflow_dispatch:
+    branches:
+      - master
+    pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        job:
+          - os: windows-latest
+
+    name: Build
+    runs-on: ${{ matrix.job.os }}
+    env:
+      RUST_BACKTRACE: full
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Determine Binary Name
+        id: determine-os
+        shell: bash
+        run: |
+          BINARY=cs2-auto-accept_windows_amd64.exe
+          echo "binary_name=$BINARY" >> $GITHUB_OUTPUT
+      - name: Cache Cargo packages
+        id: cache-cargo
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-cargo
+          path: |
+            ~/.cargo
+            ~/.rustup
+            $PWD/target
+      - if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' }}
+        name: Update rust
+        run: rustup update
+      - name: Build binary
+        run: |
+          cargo build --profile release
+      - name: Rename binary
+        id: rename
+        shell: bash
+        env:
+          BINARY_NAME: ${{ steps.determine-os.outputs.binary_name }}
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            mv target/release/cs2-auto-accept.exe target/release/$BINARY_NAME
+          fi
+          echo "bin=target/release/$BINARY_NAME" >> $GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v4.3.3
+        with:
+          name: ${{ steps.determine-os.outputs.binary_name }}
+          path: target/release/${{ steps.determine-os.outputs.binary_name }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ steps.rename.outputs.bin }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
