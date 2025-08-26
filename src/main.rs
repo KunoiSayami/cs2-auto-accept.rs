@@ -2,20 +2,20 @@ mod configure;
 mod definitions;
 mod target_5e;
 mod target_main;
+mod tools;
 
 use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
 
-use clap::Command;
-use configure::Point;
-use enigo::{Enigo, Mouse};
+use clap::{Command, arg};
+use configure::{Configure, Point};
+use enigo::Mouse;
 use image::{DynamicImage, ImageBuffer, Rgb};
 use sysinfo::{ProcessRefreshKind, RefreshKind};
+use tools::load_and_display;
 use xcap::Monitor;
-
-use crate::target_main::handle_target;
 
 enum SearchResult {
     Found(usize, usize),
@@ -137,26 +137,66 @@ fn display_mouse() -> anyhow::Result<()> {
     }
 }
 
+fn handle_target(point: Option<Point>, is_5e: bool, template: &[Rgb<u8>]) -> anyhow::Result<bool> {
+    if let SearchResult::Found(pos1, pos2) = check_image_match(point, is_5e, template)? {
+        log::trace!("{pos1} {pos2}");
+        let mut eg = enigo::Enigo::new(&enigo::Settings::default())?;
+        eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
+        eg.button(enigo::Button::Left, enigo::Direction::Click)?;
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 fn main() -> anyhow::Result<()> {
     let matches = clap::command!()
+        .args(&[arg!([CONFIG] "Configure file").default_value("config.toml")])
         .subcommand(Command::new("mouse"))
+        .subcommand(Command::new("get-color").arg(arg!(<FILE> ... "Image file")))
         .get_matches();
 
     match matches.subcommand() {
         Some(("mouse", _)) => {
             return display_mouse();
         }
+        Some(("get-color", matches)) => {
+            return load_and_display(&matches.get_many("FILE").unwrap());
+        }
         _ => {}
     }
 
     env_logger::Builder::from_default_env().init();
 
-    let mut sys = sysinfo::System::new_with_specifics(
-        RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
-    );
+    let config = Configure::load(matches.get_one("CONFIG").unwrap())?;
 
-    sys.refresh_all();
+    loop {
+        let mut sys = sysinfo::System::new_with_specifics(
+            RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
+        );
 
-    handle_target()?;
-    Ok(())
+        sys.refresh_all();
+
+        match target_5e::check_need_handle(sys.processes()) {
+            CheckResult::NeedProcess => {
+                handle_target(config.e5(), true, target_5e::MATCH_TEMPLATE)?;
+            }
+            CheckResult::NoNeedProcess => {
+                sleep(Duration::from_secs(60));
+                continue;
+            }
+            CheckResult::Next => {}
+        }
+
+        match target_main::check_primary_exec(sys.processes()) {
+            CheckResult::NeedProcess => {
+                handle_target(config.cs2(), false, target_main::MATCH_TEMPLATE)?;
+            }
+            CheckResult::NoNeedProcess => {
+                unimplemented!()
+            }
+            CheckResult::Next => {}
+        }
+        sleep(Duration::from_secs(5));
+    }
 }
