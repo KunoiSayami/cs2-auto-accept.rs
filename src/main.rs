@@ -12,7 +12,7 @@ use std::{
 
 use clap::{Command, arg};
 use configure::{Configure, Point};
-use enigo::Mouse;
+use enigo::{Enigo, Mouse};
 use image::{DynamicImage, ImageBuffer, Rgb};
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::load_and_display;
@@ -147,11 +147,15 @@ fn display_mouse() -> anyhow::Result<()> {
     }
 }
 
-fn handle_target(point: Option<Point>, is_5e: bool, template: &[Rgb<u8>]) -> anyhow::Result<bool> {
+fn handle_target(
+    point: Option<Point>,
+    is_5e: bool,
+    template: &[Rgb<u8>],
+    eg: &mut Enigo,
+) -> anyhow::Result<bool> {
     let test_mode = TEST_MODE.load(std::sync::atomic::Ordering::Relaxed);
     if let SearchResult::Found(pos1, pos2) = check_image_match(point, is_5e, template)? {
         log::debug!("x: {pos1}, y: {pos2}");
-        let mut eg = enigo::Enigo::new(&enigo::Settings::default())?;
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
         if !test_mode {
             eg.button(enigo::Button::Left, enigo::Direction::Click)?;
@@ -204,6 +208,7 @@ fn main() -> anyhow::Result<()> {
     let mut sys = sysinfo::System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
+    let mut eg = Enigo::new(&enigo::Settings::default())?;
 
     log::info!("Starting listening");
 
@@ -212,7 +217,7 @@ fn main() -> anyhow::Result<()> {
 
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
-                handle_target(config.e5(), true, target_5e::MATCH_TEMPLATE)?;
+                handle_target(config.e5(), true, target_5e::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
                 sleep(Duration::from_secs(60));
@@ -223,7 +228,7 @@ fn main() -> anyhow::Result<()> {
 
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
-                handle_target(config.cs2(), false, target_main::MATCH_TEMPLATE)?;
+                handle_target(config.cs2(), false, target_main::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
                 unimplemented!()
