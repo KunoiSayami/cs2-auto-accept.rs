@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fs::OpenOptions, io::Write};
 
 use clap::parser::ValuesRef;
 use image::Rgb;
@@ -26,9 +26,9 @@ impl std::fmt::Display for RGB2 {
     }
 }
 
-pub fn load_and_display(p: &ValuesRef<String>) -> anyhow::Result<()> {
+pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> anyhow::Result<()> {
     let mut set = HashSet::new();
-    println!("&[");
+    let mut output = vec!["&[".into()];
 
     for file in p.clone().into_iter() {
         let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
@@ -41,10 +41,21 @@ pub fn load_and_display(p: &ValuesRef<String>) -> anyhow::Result<()> {
         }
 
         for x in set.iter() {
-            println!("Rgb([{x}]),")
+            output.push(format!("Rgb([{x}]),"));
         }
     }
-    println!("]");
+    output.push("]".into());
+    let data = output.into_iter().collect::<String>();
 
+    if let Some(output_file) = output_file {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(output_file)?;
+        file.write_all(data.as_bytes())?;
+    } else {
+        println!("{data}");
+    }
     Ok(())
 }

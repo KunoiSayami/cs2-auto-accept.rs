@@ -5,6 +5,7 @@ mod target_main;
 mod tools;
 
 use std::{
+    sync::atomic::AtomicBool,
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -16,6 +17,8 @@ use image::{DynamicImage, ImageBuffer, Rgb};
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::load_and_display;
 use xcap::Monitor;
+
+static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
 enum SearchResult {
     Found(usize, usize),
@@ -35,11 +38,11 @@ type ImageType = ImageBuffer<image::Rgb<u8>, SubImageType>;
 
 fn determine_point(monitor: Monitor, is_5e: bool) -> anyhow::Result<Point> {
     let x = monitor.x()?;
-    let y = monitor.y()? - 100;
+    let y = monitor.y()? - if is_5e { -50 } else { 100 };
     let height = monitor.height()? as i32;
     let width = monitor.width()? as i32;
-    let h = if is_5e { 400 } else { 200 } / 2;
-    let w = if is_5e { 800 } else { 400 } / 2;
+    let h = 100;
+    let w = 200;
 
     let mid_x = x + width / 2;
     let mid_y = y + height / 2;
@@ -66,11 +69,13 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
             real_point.width() as u32,
             real_point.height() as u32,
         )?;
-        log::debug!("{real_point:?}");
+        //log::debug!("{real_point:?}");
 
         //return Ok(DynamicImage::from(image).into_rgb8());
         log::trace!("elapsed: {:?}", start.elapsed());
-        //image.save("output.png")?;
+        if TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+            image.save("output.png")?;
+        }
         return Ok((real_point, DynamicImage::from(image).into_rgb8()));
     }
     Err(anyhow::anyhow!("Not found primary monitor"))
@@ -96,12 +101,17 @@ fn match_algorithm(point: Point, area: &ImageType, template: &[Rgb<u8>]) -> Sear
             let original_x = x - x_start;
             let original_y = y - y_start;
             let mut r = true;
+            //let mut matched = 0;
             'outer: for x in original_x..(original_x + X_LIMIT) {
                 for y in original_y..(original_y + Y_LIMIT) {
                     if !buff[x][y] {
+                        /* if matched > 0 {
+                            log::debug!("Matched: {matched}");
+                        } */
                         r = false;
                         break 'outer;
                     }
+                    //matched += 1;
                 }
             }
             if r {
@@ -129,7 +139,7 @@ fn display_mouse() -> anyhow::Result<()> {
     loop {
         let (x, y) = eg.location()?;
         if prev_x != x || prev_y != y {
-            log::debug!("x: {x}, y: {y}");
+            println!("x: {x}, y: {y}");
             prev_x = x;
             prev_y = y;
         }
@@ -138,11 +148,18 @@ fn display_mouse() -> anyhow::Result<()> {
 }
 
 fn handle_target(point: Option<Point>, is_5e: bool, template: &[Rgb<u8>]) -> anyhow::Result<bool> {
+    let test_mode = TEST_MODE.load(std::sync::atomic::Ordering::Relaxed);
     if let SearchResult::Found(pos1, pos2) = check_image_match(point, is_5e, template)? {
-        log::trace!("{pos1} {pos2}");
+        log::debug!("x: {pos1}, y: {pos2}");
         let mut eg = enigo::Enigo::new(&enigo::Settings::default())?;
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
-        eg.button(enigo::Button::Left, enigo::Direction::Click)?;
+        if !test_mode {
+            eg.button(enigo::Button::Left, enigo::Direction::Click)?;
+            sleep(Duration::from_secs(1));
+            eg.button(enigo::Button::Left, enigo::Direction::Click)?;
+        } else {
+            log::debug!("clicked");
+        }
         return Ok(true);
     }
 
@@ -150,10 +167,19 @@ fn handle_target(point: Option<Point>, is_5e: bool, template: &[Rgb<u8>]) -> any
 }
 
 fn main() -> anyhow::Result<()> {
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
     let matches = clap::command!()
-        .args(&[arg!([CONFIG] "Configure file").default_value("config.toml")])
+        .args(&[
+            arg!([CONFIG] "Configure file").default_value("config.toml"),
+            arg!(--"dry-run" "Dry run (do not click)"),
+        ])
         .subcommand(Command::new("mouse"))
-        .subcommand(Command::new("get-color").arg(arg!(<FILE> ... "Image file")))
+        .subcommand(Command::new("get-color").args(&[
+            arg!(<FILE> ... "Image file"),
+            arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
+        ]))
         .get_matches();
 
     match matches.subcommand() {
@@ -161,20 +187,25 @@ fn main() -> anyhow::Result<()> {
             return display_mouse();
         }
         Some(("get-color", matches)) => {
-            return load_and_display(&matches.get_many("FILE").unwrap());
+            return load_and_display(
+                &matches.get_many("FILE").unwrap(),
+                matches.get_one("output"),
+            );
         }
         _ => {}
     }
 
-    env_logger::Builder::from_default_env().init();
+    TEST_MODE.store(
+        matches.get_flag("dry-run"),
+        std::sync::atomic::Ordering::Relaxed,
+    );
 
-    let config = Configure::load(matches.get_one("CONFIG").unwrap())?;
+    let config = Configure::load(matches.get_one("CONFIG").unwrap()).unwrap_or_default();
+    let mut sys = sysinfo::System::new_with_specifics(
+        RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
+    );
 
     loop {
-        let mut sys = sysinfo::System::new_with_specifics(
-            RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
-        );
-
         sys.refresh_all();
 
         match target_5e::check_need_handle(sys.processes()) {
@@ -197,6 +228,11 @@ fn main() -> anyhow::Result<()> {
             }
             CheckResult::Next => {}
         }
-        sleep(Duration::from_secs(5));
+        //log::debug!("Next tick");
+        if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
+            sleep(Duration::from_secs(5));
+        } else {
+            sleep(Duration::from_millis(300));
+        }
     }
 }
