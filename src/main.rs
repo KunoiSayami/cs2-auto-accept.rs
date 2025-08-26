@@ -205,6 +205,8 @@ fn main() -> anyhow::Result<()> {
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
 
+    log::info!("Starting listening");
+
     loop {
         sys.refresh_all();
 
