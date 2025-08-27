@@ -5,9 +5,10 @@ use sysinfo::{Pid, Process};
 use crate::{
     CheckResult,
     definitions::{PROCESS_5E_NAME, PROCESS_NAME},
+    matcher::Matcher,
 };
 
-pub const MATCH_TEMPLATE: &[Rgb<u8>] = include!("5e.template");
+pub const MATCH_TEMPLATE: Matcher = Matcher::new(true, &[Rgb([72, 180, 30])]);
 
 #[must_use]
 pub(crate) fn check_need_handle(process: &HashMap<Pid, Process>) -> CheckResult {

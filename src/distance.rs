@@ -1,11 +1,14 @@
 use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
-    sync::mpsc::{Receiver, channel},
+    sync::{
+        Arc,
+        mpsc::{Receiver, channel},
+    },
     thread::spawn,
 };
 
-use crate::{target_5e::MATCH_TEMPLATE, tools::RGB2};
+use crate::tools::RGB2;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct RGB2Info {
@@ -91,10 +94,26 @@ fn write_thread(mut file: File, recv: Receiver<DataEvent>) -> anyhow::Result<()>
     Ok(())
 }
 
-pub(crate) fn calc_color_distance(read_only: bool) -> anyhow::Result<()> {
+fn load_rgb(file: &str) -> anyhow::Result<Vec<RGB2>> {
+    let reader = BufReader::new(File::open(file)?);
+    let mut lines = reader.lines();
+
+    let mut v = vec![];
+
+    while let Some(line) = lines.next() {
+        let line = line?;
+        let s = line.split(", ").collect::<Vec<_>>();
+        v.push(RGB2::new(s[0].parse()?, s[1].parse()?, s[2].parse()?));
+    }
+
+    Ok(v)
+}
+
+pub(crate) fn calc_color_distance(input: &String, read_only: bool) -> anyhow::Result<()> {
     if read_only {
         return only_read();
     }
+    let input = Arc::new(load_rgb(input)?);
     let file = OpenOptions::new()
         .create(true)
         .truncate(true)
@@ -109,8 +128,9 @@ pub(crate) fn calc_color_distance(read_only: bool) -> anyhow::Result<()> {
             for b in 0..50 {
                 let basic = RGB2::new(r, g, b);
                 let sender = s.clone();
+                let input = input.clone();
                 pool.execute(move || {
-                    let ret = inner_calc_color_distance(basic);
+                    let ret = inner_calc_color_distance(basic, input);
                     sender.send(DataEvent::New(ret)).unwrap();
                 });
             }
@@ -123,15 +143,15 @@ pub(crate) fn calc_color_distance(read_only: bool) -> anyhow::Result<()> {
 }
 
 #[must_use]
-fn inner_calc_color_distance(basic: RGB2) -> RGB2Info {
+fn inner_calc_color_distance(basic: RGB2, input: Arc<Vec<RGB2>>) -> RGB2Info {
     //let basic = RGB2::new(80, 255, 20);
     //let basic = RGB2::new(70, 255, 30);
     let mut v = Vec::new();
 
     let mut max = f32::MIN;
     let mut min = f32::MAX;
-    for x in MATCH_TEMPLATE {
-        let other = RGB2::from(x);
+    for other in input.iter() {
+        //let other = RGB2::from(x);
         let d = basic.distance(&other);
         max = max.max(d);
         min = min.min(d);

@@ -24,6 +24,16 @@ impl RGB2 {
     }
 }
 
+impl From<Rgb<u8>> for RGB2 {
+    fn from(value: Rgb<u8>) -> Self {
+        Self {
+            r: value.0[0],
+            g: value.0[1],
+            b: value.0[2],
+        }
+    }
+}
+
 impl From<&Rgb<u8>> for RGB2 {
     fn from(value: &Rgb<u8>) -> Self {
         Self {
@@ -42,7 +52,7 @@ impl std::fmt::Display for RGB2 {
 
 pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> anyhow::Result<()> {
     let mut set = HashSet::new();
-    let mut output = vec!["&[".into()];
+    let mut output = vec![];
 
     for file in p.clone().into_iter() {
         let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
@@ -55,11 +65,12 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
         }
 
         for x in set.iter() {
-            output.push(format!("Rgb([{x}]),"));
+            output.push(x.to_string());
         }
     }
-    output.push("]".into());
-    let data = output.into_iter().collect::<String>();
+    //output.push("]".into());
+
+    let data = output.join("\n");
 
     if let Some(output_file) = output_file {
         let mut file = OpenOptions::new()

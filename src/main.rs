@@ -1,6 +1,7 @@
 mod configure;
 mod definitions;
 mod distance;
+mod matcher;
 mod target_5e;
 mod target_main;
 mod tools;
@@ -19,7 +20,7 @@ use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::load_and_display;
 use xcap::Monitor;
 
-use crate::distance::calc_color_distance;
+use crate::{distance::calc_color_distance, matcher::Matcher};
 
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
@@ -85,14 +86,14 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
     Err(anyhow::anyhow!("Not found primary monitor"))
 }
 
-fn match_algorithm(point: Point, area: &ImageType, template: &[BasicImageType]) -> SearchResult {
+fn match_algorithm(point: Point, area: &ImageType, template: &Matcher) -> SearchResult {
     const X_LIMIT: usize = 10;
     const Y_LIMIT: usize = 8;
     let (pic_x, pic_y) = area.dimensions();
     let mut buff = vec![vec![false; pic_y as usize]; pic_x as usize];
     //let mut result = vec![vec![false; pic_y as usize - Y_LIMIT]; pic_x as usize - X_LIMIT];
     for (x, y, pixel) in area.enumerate_pixels() {
-        buff[x as usize][y as usize] = template.iter().any(|x| x == pixel);
+        buff[x as usize][y as usize] = template.check(pixel);
     }
 
     let x_start = X_LIMIT / 2;
@@ -129,7 +130,7 @@ fn match_algorithm(point: Point, area: &ImageType, template: &[BasicImageType]) 
 pub(crate) fn check_image_match(
     point: Option<Point>,
     is_5e: bool,
-    template: &[BasicImageType],
+    template: &Matcher,
 ) -> anyhow::Result<SearchResult> {
     let (point, current_screen) = screen_cap(point, is_5e)?;
     Ok(match_algorithm(point, &current_screen, template))
@@ -151,14 +152,11 @@ fn display_mouse() -> anyhow::Result<()> {
     }
 }
 
-fn handle_target(
-    point: Option<Point>,
-    is_5e: bool,
-    template: &[BasicImageType],
-    eg: &mut Enigo,
-) -> anyhow::Result<bool> {
+fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> anyhow::Result<bool> {
     let test_mode = TEST_MODE.load(std::sync::atomic::Ordering::Relaxed);
-    if let SearchResult::Found(pos1, pos2) = check_image_match(point, is_5e, template)? {
+    if let SearchResult::Found(pos1, pos2) =
+        check_image_match(point, template.use_diff(), template)?
+    {
         log::debug!("x: {pos1}, y: {pos2}");
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
         if !test_mode {
@@ -188,7 +186,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
-                handle_target(config.e5(), true, target_5e::MATCH_TEMPLATE, &mut eg)?;
+                handle_target(config.e5(), &target_5e::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
                 sleep(Duration::from_secs(60));
@@ -199,7 +197,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
-                handle_target(config.cs2(), false, target_main::MATCH_TEMPLATE, &mut eg)?;
+                handle_target(config.cs2(), &target_main::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
                 unimplemented!()
@@ -229,7 +227,10 @@ fn main() -> anyhow::Result<()> {
             arg!(<FILE> ... "Image file"),
             arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
         ]))
-        .subcommand(Command::new("distance").args(&[arg!(--"read-only" "No write, just read")]))
+        .subcommand(Command::new("distance").args(&[
+            arg!(<FILE> "RGB file, generate by get-color command"),
+            arg!(--"read-only" "No write, just read"),
+        ]))
         .get_matches();
 
     TEST_MODE.store(
@@ -243,7 +244,10 @@ fn main() -> anyhow::Result<()> {
             &matches.get_many("FILE").unwrap(),
             matches.get_one("output"),
         ),
-        Some(("distance", matches)) => calc_color_distance(matches.get_flag("read-only")),
+        Some(("distance", matches)) => calc_color_distance(
+            matches.get_one("FILE").unwrap(),
+            matches.get_flag("read-only"),
+        ),
         _ => real_main(matches.get_one("CONFIG").unwrap()),
     }
 }
