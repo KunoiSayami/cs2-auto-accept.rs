@@ -4,6 +4,8 @@ use chrono::Local;
 use clap::parser::ValuesRef;
 use image::Rgb;
 
+use crate::{X_LIMIT, Y_LIMIT, configure::Point, match_algorithm, process_area};
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Default)]
 pub(crate) struct RGB2 {
     r: u8,
@@ -89,4 +91,25 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
 
 pub(crate) fn timestamp_fmt(fmt: &str) -> String {
     Local::now().format(fmt).to_string()
+}
+
+pub(crate) fn test_image(file: &String, is_5e: bool) -> anyhow::Result<()> {
+    let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
+
+    let (buff, count) = process_area(
+        &image,
+        if is_5e {
+            &crate::target_5e::MATCH_TEMPLATE
+        } else {
+            &crate::target_main::MATCH_TEMPLATE
+        },
+    );
+    if count < X_LIMIT * Y_LIMIT {
+        println!("Early exit {count}");
+        return Ok(());
+    }
+    let (x, y) = image.dimensions();
+    let ret = match_algorithm(Point::new(0, 0, x as i32, y as i32), &buff, (x, y));
+    println!("{ret:?}");
+    Ok(())
 }

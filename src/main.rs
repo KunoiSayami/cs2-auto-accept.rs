@@ -18,7 +18,7 @@ use enigo::{Enigo, Mouse};
 use image::{DynamicImage, ImageBuffer, Rgb};
 use rayon::iter::ParallelIterator;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
-use tools::{load_and_display, timestamp_fmt};
+use tools::{load_and_display, test_image, timestamp_fmt};
 use xcap::Monitor;
 
 use crate::matcher::Matcher;
@@ -39,7 +39,7 @@ static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 const X_LIMIT: usize = 10;
 const Y_LIMIT: usize = 8;
 
-macro_rules! printn {
+macro_rules! print_inline {
     ($($arg:tt)*) => {{
         print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S] "));
         print!($($arg)*);
@@ -58,6 +58,7 @@ macro_rules! sleep_until_exit {
     };
 }
 
+#[derive(Debug)]
 enum SearchResult {
     Found(usize, usize),
     NotFound,
@@ -183,14 +184,14 @@ pub(crate) fn check_image_match(
     is_5e: bool,
     template: &Matcher,
 ) -> anyhow::Result<SearchResult> {
-    printn!("Capture screen             ");
+    print_inline!("Capture screen             ");
     let (point, current_screen) = screen_cap(point, is_5e)?;
-    printn!("Marking area into Vec<bool>");
+    print_inline!("Marking area into Vec<bool>");
     let (buff, count) = process_area(&current_screen, template);
     if count < X_LIMIT * Y_LIMIT {
         return Ok(SearchResult::NotFound);
     }
-    printn!("Checking point of interest");
+    print_inline!("Checking point of interest");
     //let instant = Instant::now();
     let ret = match_algorithm(point, &buff, current_screen.dimensions());
     //log::debug!("elapsed: {:?}", instant.elapsed());
@@ -214,13 +215,12 @@ fn display_mouse() -> anyhow::Result<()> {
 }
 
 fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> anyhow::Result<bool> {
-    let test_mode = TEST_MODE.load(std::sync::atomic::Ordering::Relaxed);
     if let SearchResult::Found(pos1, pos2) =
         check_image_match(point, template.use_diff(), template)?
     {
         log::debug!("move mouse: x: {pos1}, y: {pos2}");
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
-        if !test_mode {
+        if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
             eg.button(enigo::Button::Left, enigo::Direction::Click)?;
             sleep(Duration::from_secs(1));
             eg.button(enigo::Button::Left, enigo::Direction::Click)?;
@@ -255,11 +255,11 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
-                printn!("Match 5e     ");
+                print_inline!("Match 5e     ");
                 handle_target(config.e5(), &target_5e::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
-                printn!("User is playing     ");
+                print_inline!("User is playing     ");
                 sleep_until_exit!(60);
                 continue;
             }
@@ -268,7 +268,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
-                printn!("Match CS2     ");
+                print_inline!("Match CS2     ");
                 handle_target(config.cs2(), &target_main::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
@@ -277,9 +277,9 @@ fn real_main(config: &String) -> anyhow::Result<()> {
             CheckResult::Next => {}
         }
         //log::debug!("Next tick");
-        printn!("Sleep                      ");
+        print_inline!("Sleep                      ");
         if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            sleep_until_exit!(5);
+            sleep_until_exit!(3);
         } else {
             sleep_until_exit!(2);
         }
@@ -316,12 +316,16 @@ fn main() -> anyhow::Result<()> {
                 ])
                 .hide(cfg!(feature = "distance")),
         )
+        .subcommand(
+            Command::new("test").args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
+        )
         .get_matches();
 
-    TEST_MODE.store(
-        matches.get_flag("dry-run"),
-        std::sync::atomic::Ordering::Relaxed,
-    );
+    if matches.get_flag("dry-run") {
+        TEST_MODE.store(true, std::sync::atomic::Ordering::Relaxed);
+        log::debug!("Dry running");
+    }
+
     SAVE_IMAGE.store(
         matches.get_flag("save-image"),
         std::sync::atomic::Ordering::Relaxed,
@@ -337,6 +341,9 @@ fn main() -> anyhow::Result<()> {
             matches.get_one("FILE").unwrap(),
             matches.get_flag("read-only"),
         ),
+        Some(("test", matches)) => {
+            test_image(matches.get_one("FILE").unwrap(), matches.get_flag("5e"))
+        }
         _ => real_main(matches.get_one("CONFIG").unwrap()),
     }
 }

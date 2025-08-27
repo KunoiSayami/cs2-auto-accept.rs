@@ -16,9 +16,13 @@ impl Matcher {
 
     pub(crate) fn check(&self, pixel: &BasicImageType) -> bool {
         if !self.use_diff {
+            //let ret = ;
+            //println!("{pixel:?} {ret:?}");
             return self.template.iter().any(|x| x == pixel);
         }
         let pixel = RGB2::from(pixel);
-        pixel.distance(&RGB2::from(self.template[0])) < 90.0
+        self.template
+            .iter()
+            .any(|x| pixel.distance(&RGB2::from(x)) < 90.0)
     }
 }
