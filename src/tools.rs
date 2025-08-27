@@ -1,5 +1,6 @@
 use std::{collections::HashSet, fs::OpenOptions, io::Write};
 
+use chrono::Local;
 use clap::parser::ValuesRef;
 use image::Rgb;
 
@@ -84,4 +85,8 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
         println!("{data}");
     }
     Ok(())
+}
+
+pub(crate) fn timestamp_fmt(fmt: &str) -> String {
+    Local::now().format(fmt).to_string()
 }

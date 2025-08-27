@@ -18,7 +18,7 @@ use enigo::{Enigo, Mouse};
 use image::{DynamicImage, ImageBuffer, Rgb};
 use rayon::iter::ParallelIterator;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
-use tools::load_and_display;
+use tools::{load_and_display, timestamp_fmt};
 use xcap::Monitor;
 
 use crate::matcher::Matcher;
@@ -33,6 +33,7 @@ mod distance {
 }
 
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
+static SAVE_IMAGE: AtomicBool = AtomicBool::new(false);
 static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 
 const X_LIMIT: usize = 10;
@@ -40,7 +41,7 @@ const Y_LIMIT: usize = 8;
 
 macro_rules! printn {
     ($($arg:tt)*) => {{
-        print!("\r");
+        print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S] "));
         print!($($arg)*);
         print!("\r");
         {
@@ -50,22 +51,11 @@ macro_rules! printn {
 }
 
 macro_rules! sleep_until_exit {
-    ($time:expr) => {{
-        if EXIT_SIGNAL.get().is_some() {
+    ($time:expr) => {
+        if sleep_until_exit($time) {
             break;
         }
-        let mut r = false;
-        for _ in 0..($time * 2) {
-            sleep(Duration::from_millis(500));
-            if EXIT_SIGNAL.get().is_some() {
-                r = true;
-                break;
-            }
-        }
-        if r {
-            break;
-        }
-    }};
+    };
 }
 
 enum SearchResult {
@@ -122,8 +112,8 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
 
         //return Ok(DynamicImage::from(image).into_rgb8());
         log::trace!("elapsed: {:?}", start.elapsed());
-        if TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            image.save("output.png")?;
+        if SAVE_IMAGE.load(std::sync::atomic::Ordering::Relaxed) {
+            image.save(format!("{}.png", timestamp_fmt("%Y-%m-%d_%H-%M-%S")))?;
         }
         return Ok((real_point, DynamicImage::from(image).into_rgb8()));
     }
@@ -241,15 +231,15 @@ fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> an
     Ok(false)
 }
 
-/* fn sleep_until_exit(second: usize) -> bool {
+fn sleep_until_exit(second: usize) -> bool {
     for _ in 0..(second * 2) {
-        sleep(Duration::from_millis(500));
         if EXIT_SIGNAL.get().is_some() {
             return true;
         }
+        sleep(Duration::from_millis(500));
     }
     false
-} */
+}
 
 fn real_main(config: &String) -> anyhow::Result<()> {
     let config = Configure::load(config).unwrap_or_default();
@@ -311,6 +301,7 @@ fn main() -> anyhow::Result<()> {
         .args(&[
             arg!([CONFIG] "Configure file").default_value("config.toml"),
             arg!(--"dry-run" "Dry run (do not click)"),
+            arg!(--"save-image" "Save image each time take"),
         ])
         .subcommand(Command::new("mouse"))
         .subcommand(Command::new("get-color").args(&[
@@ -329,6 +320,10 @@ fn main() -> anyhow::Result<()> {
 
     TEST_MODE.store(
         matches.get_flag("dry-run"),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+    SAVE_IMAGE.store(
+        matches.get_flag("save-image"),
         std::sync::atomic::Ordering::Relaxed,
     );
 
