@@ -6,7 +6,8 @@ mod target_main;
 mod tools;
 
 use std::{
-    sync::{atomic::AtomicBool, mpsc},
+    io::Write,
+    sync::{OnceLock, atomic::AtomicBool, mpsc},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -32,9 +33,40 @@ mod distance {
 }
 
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
+static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 
 const X_LIMIT: usize = 10;
 const Y_LIMIT: usize = 8;
+
+macro_rules! printn {
+    ($($arg:tt)*) => {{
+        print!("\r");
+        print!($($arg)*);
+        print!("\r");
+        {
+            std::io::stdout().lock().flush().unwrap();
+        }
+    }};
+}
+
+macro_rules! sleep_until_exit {
+    ($time:expr) => {{
+        if EXIT_SIGNAL.get().is_some() {
+            break;
+        }
+        let mut r = false;
+        for _ in 0..($time * 2) {
+            sleep(Duration::from_millis(500));
+            if EXIT_SIGNAL.get().is_some() {
+                r = true;
+                break;
+            }
+        }
+        if r {
+            break;
+        }
+    }};
+}
 
 enum SearchResult {
     Found(usize, usize),
@@ -161,12 +193,14 @@ pub(crate) fn check_image_match(
     is_5e: bool,
     template: &Matcher,
 ) -> anyhow::Result<SearchResult> {
+    printn!("Capture screen             ");
     let (point, current_screen) = screen_cap(point, is_5e)?;
+    printn!("Marking area into Vec<bool>");
     let (buff, count) = process_area(&current_screen, template);
-
     if count < X_LIMIT * Y_LIMIT {
         return Ok(SearchResult::NotFound);
     }
+    printn!("Checking point of interest");
     //let instant = Instant::now();
     let ret = match_algorithm(point, &buff, current_screen.dimensions());
     //log::debug!("elapsed: {:?}", instant.elapsed());
@@ -207,6 +241,16 @@ fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> an
     Ok(false)
 }
 
+/* fn sleep_until_exit(second: usize) -> bool {
+    for _ in 0..(second * 2) {
+        sleep(Duration::from_millis(500));
+        if EXIT_SIGNAL.get().is_some() {
+            return true;
+        }
+    }
+    false
+} */
+
 fn real_main(config: &String) -> anyhow::Result<()> {
     let config = Configure::load(config).unwrap_or_default();
     let mut sys = sysinfo::System::new_with_specifics(
@@ -221,10 +265,12 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
+                printn!("Match 5e     ");
                 handle_target(config.e5(), &target_5e::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
-                sleep(Duration::from_secs(60));
+                printn!("User is playing     ");
+                sleep_until_exit!(60);
                 continue;
             }
             CheckResult::Next => {}
@@ -232,6 +278,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
+                printn!("Match CS2     ");
                 handle_target(config.cs2(), &target_main::MATCH_TEMPLATE, &mut eg)?;
             }
             CheckResult::NoNeedProcess => {
@@ -240,12 +287,15 @@ fn real_main(config: &String) -> anyhow::Result<()> {
             CheckResult::Next => {}
         }
         //log::debug!("Next tick");
+        printn!("Sleep                      ");
         if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            sleep(Duration::from_secs(5));
+            sleep_until_exit!(5);
         } else {
-            sleep(Duration::from_secs(2));
+            sleep_until_exit!(2);
         }
     }
+    log::info!("User exit");
+    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
@@ -253,6 +303,10 @@ fn main() -> anyhow::Result<()> {
         .filter_level(log::LevelFilter::Debug)
         .filter_module("enigo", log::LevelFilter::Warn)
         .init();
+    ctrlc::set_handler(|| {
+        EXIT_SIGNAL.set(true).unwrap();
+    })
+    .unwrap();
     let matches = clap::command!()
         .args(&[
             arg!([CONFIG] "Configure file").default_value("config.toml"),
