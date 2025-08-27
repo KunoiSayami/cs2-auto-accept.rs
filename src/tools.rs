@@ -3,11 +3,25 @@ use std::{collections::HashSet, fs::OpenOptions, io::Write};
 use clap::parser::ValuesRef;
 use image::Rgb;
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-struct RGB2 {
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Default)]
+pub(crate) struct RGB2 {
     r: u8,
     g: u8,
     b: u8,
+}
+
+impl RGB2 {
+    pub(crate) fn new(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+
+    pub(crate) fn distance(&self, other: &Self) -> f32 {
+        let r = self.r as i32 - other.r as i32;
+        let g = self.g as i32 - other.g as i32;
+        let b = self.b as i32 - other.b as i32;
+        let d2 = r * r + g * g + b * b;
+        (d2 as f32).sqrt()
+    }
 }
 
 impl From<&Rgb<u8>> for RGB2 {

@@ -1,5 +1,6 @@
 mod configure;
 mod definitions;
+mod distance;
 mod target_5e;
 mod target_main;
 mod tools;
@@ -18,6 +19,8 @@ use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::load_and_display;
 use xcap::Monitor;
 
+use crate::distance::calc_color_distance;
+
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
 
 enum SearchResult {
@@ -33,8 +36,9 @@ enum CheckResult {
     Next,
 }
 
+type BasicImageType = Rgb<u8>;
 type SubImageType = Vec<u8>;
-type ImageType = ImageBuffer<image::Rgb<u8>, SubImageType>;
+type ImageType = ImageBuffer<BasicImageType, SubImageType>;
 
 fn determine_point(monitor: Monitor, is_5e: bool) -> anyhow::Result<Point> {
     let x = monitor.x()?;
@@ -81,7 +85,7 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
     Err(anyhow::anyhow!("Not found primary monitor"))
 }
 
-fn match_algorithm(point: Point, area: &ImageType, template: &[Rgb<u8>]) -> SearchResult {
+fn match_algorithm(point: Point, area: &ImageType, template: &[BasicImageType]) -> SearchResult {
     const X_LIMIT: usize = 10;
     const Y_LIMIT: usize = 8;
     let (pic_x, pic_y) = area.dimensions();
@@ -125,7 +129,7 @@ fn match_algorithm(point: Point, area: &ImageType, template: &[Rgb<u8>]) -> Sear
 pub(crate) fn check_image_match(
     point: Option<Point>,
     is_5e: bool,
-    template: &[Rgb<u8>],
+    template: &[BasicImageType],
 ) -> anyhow::Result<SearchResult> {
     let (point, current_screen) = screen_cap(point, is_5e)?;
     Ok(match_algorithm(point, &current_screen, template))
@@ -150,7 +154,7 @@ fn display_mouse() -> anyhow::Result<()> {
 fn handle_target(
     point: Option<Point>,
     is_5e: bool,
-    template: &[Rgb<u8>],
+    template: &[BasicImageType],
     eg: &mut Enigo,
 ) -> anyhow::Result<bool> {
     let test_mode = TEST_MODE.load(std::sync::atomic::Ordering::Relaxed);
@@ -170,41 +174,8 @@ fn handle_target(
     Ok(false)
 }
 
-fn main() -> anyhow::Result<()> {
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
-    let matches = clap::command!()
-        .args(&[
-            arg!([CONFIG] "Configure file").default_value("config.toml"),
-            arg!(--"dry-run" "Dry run (do not click)"),
-        ])
-        .subcommand(Command::new("mouse"))
-        .subcommand(Command::new("get-color").args(&[
-            arg!(<FILE> ... "Image file"),
-            arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
-        ]))
-        .get_matches();
-
-    match matches.subcommand() {
-        Some(("mouse", _)) => {
-            return display_mouse();
-        }
-        Some(("get-color", matches)) => {
-            return load_and_display(
-                &matches.get_many("FILE").unwrap(),
-                matches.get_one("output"),
-            );
-        }
-        _ => {}
-    }
-
-    TEST_MODE.store(
-        matches.get_flag("dry-run"),
-        std::sync::atomic::Ordering::Relaxed,
-    );
-
-    let config = Configure::load(matches.get_one("CONFIG").unwrap()).unwrap_or_default();
+fn real_main(config: &String) -> anyhow::Result<()> {
+    let config = Configure::load(config).unwrap_or_default();
     let mut sys = sysinfo::System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
@@ -241,5 +212,38 @@ fn main() -> anyhow::Result<()> {
         } else {
             sleep(Duration::from_millis(300));
         }
+    }
+}
+
+fn main() -> anyhow::Result<()> {
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
+    let matches = clap::command!()
+        .args(&[
+            arg!([CONFIG] "Configure file").default_value("config.toml"),
+            arg!(--"dry-run" "Dry run (do not click)"),
+        ])
+        .subcommand(Command::new("mouse"))
+        .subcommand(Command::new("get-color").args(&[
+            arg!(<FILE> ... "Image file"),
+            arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
+        ]))
+        .subcommand(Command::new("distance").args(&[arg!(--"read-only" "No write, just read")]))
+        .get_matches();
+
+    TEST_MODE.store(
+        matches.get_flag("dry-run"),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+
+    match matches.subcommand() {
+        Some(("mouse", _)) => display_mouse(),
+        Some(("get-color", matches)) => load_and_display(
+            &matches.get_many("FILE").unwrap(),
+            matches.get_one("output"),
+        ),
+        Some(("distance", matches)) => calc_color_distance(matches.get_flag("read-only")),
+        _ => real_main(matches.get_one("CONFIG").unwrap()),
     }
 }
