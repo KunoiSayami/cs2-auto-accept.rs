@@ -11,6 +11,7 @@ pub(crate) struct RGB2 {
 }
 
 impl RGB2 {
+    #[cfg(feature = "distance")]
     pub(crate) fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }

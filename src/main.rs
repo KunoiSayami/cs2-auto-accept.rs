@@ -1,13 +1,12 @@
 mod configure;
 mod definitions;
-mod distance;
 mod matcher;
 mod target_5e;
 mod target_main;
 mod tools;
 
 use std::{
-    sync::atomic::AtomicBool,
+    sync::{atomic::AtomicBool, mpsc},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -16,13 +15,26 @@ use clap::{Command, arg};
 use configure::{Configure, Point};
 use enigo::{Enigo, Mouse};
 use image::{DynamicImage, ImageBuffer, Rgb};
+use rayon::iter::ParallelIterator;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::load_and_display;
 use xcap::Monitor;
 
-use crate::{distance::calc_color_distance, matcher::Matcher};
+use crate::matcher::Matcher;
+
+#[cfg(feature = "distance")]
+mod distance;
+#[cfg(not(feature = "distance"))]
+mod distance {
+    pub(crate) fn calc_color_distance(_: &String, _: bool) -> ! {
+        unimplemented!("To use this function, enable \"distance\" feature")
+    }
+}
 
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
+
+const X_LIMIT: usize = 10;
+const Y_LIMIT: usize = 8;
 
 enum SearchResult {
     Found(usize, usize),
@@ -86,16 +98,33 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
     Err(anyhow::anyhow!("Not found primary monitor"))
 }
 
-fn match_algorithm(point: Point, area: &ImageType, template: &Matcher) -> SearchResult {
-    const X_LIMIT: usize = 10;
-    const Y_LIMIT: usize = 8;
+fn process_area(area: &ImageType, template: &Matcher) -> (Vec<Vec<bool>>, usize) {
     let (pic_x, pic_y) = area.dimensions();
     let mut buff = vec![vec![false; pic_y as usize]; pic_x as usize];
-    //let mut result = vec![vec![false; pic_y as usize - Y_LIMIT]; pic_x as usize - X_LIMIT];
-    for (x, y, pixel) in area.enumerate_pixels() {
-        buff[x as usize][y as usize] = template.check(pixel);
-    }
+    let iter = area.par_enumerate_pixels();
+    let mut count = 0;
+    let (sender, recv) = mpsc::channel();
 
+    //let beg = Instant::now();
+    iter.for_each_init(
+        || sender.clone(),
+        |s, (x, y, p)| {
+            if template.check(p) {
+                s.send((x, y)).ok();
+            }
+        },
+    );
+    drop(sender);
+
+    while let Ok((x, y)) = recv.recv() {
+        buff[x as usize][y as usize] = true;
+        count += 1;
+    }
+    //log::debug!("Elapsed: {:?}", beg.elapsed());
+    (buff, count)
+}
+
+fn match_algorithm(point: Point, buff: &[Vec<bool>], (pic_x, pic_y): (u32, u32)) -> SearchResult {
     let x_start = X_LIMIT / 2;
     let x_end = pic_x as usize - x_start;
     let y_start = Y_LIMIT / 2;
@@ -133,7 +162,15 @@ pub(crate) fn check_image_match(
     template: &Matcher,
 ) -> anyhow::Result<SearchResult> {
     let (point, current_screen) = screen_cap(point, is_5e)?;
-    Ok(match_algorithm(point, &current_screen, template))
+    let (buff, count) = process_area(&current_screen, template);
+
+    if count < X_LIMIT * Y_LIMIT {
+        return Ok(SearchResult::NotFound);
+    }
+    //let instant = Instant::now();
+    let ret = match_algorithm(point, &buff, current_screen.dimensions());
+    //log::debug!("elapsed: {:?}", instant.elapsed());
+    Ok(ret)
 }
 
 fn display_mouse() -> anyhow::Result<()> {
@@ -157,14 +194,12 @@ fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> an
     if let SearchResult::Found(pos1, pos2) =
         check_image_match(point, template.use_diff(), template)?
     {
-        log::debug!("x: {pos1}, y: {pos2}");
+        log::debug!("move mouse: x: {pos1}, y: {pos2}");
         eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
         if !test_mode {
             eg.button(enigo::Button::Left, enigo::Direction::Click)?;
             sleep(Duration::from_secs(1));
             eg.button(enigo::Button::Left, enigo::Direction::Click)?;
-        } else {
-            log::debug!("clicked");
         }
         return Ok(true);
     }
@@ -208,7 +243,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
         if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
             sleep(Duration::from_secs(5));
         } else {
-            sleep(Duration::from_millis(300));
+            sleep(Duration::from_secs(2));
         }
     }
 }
@@ -216,6 +251,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
 fn main() -> anyhow::Result<()> {
     env_logger::Builder::new()
         .filter_level(log::LevelFilter::Debug)
+        .filter_module("enigo", log::LevelFilter::Warn)
         .init();
     let matches = clap::command!()
         .args(&[
@@ -227,10 +263,14 @@ fn main() -> anyhow::Result<()> {
             arg!(<FILE> ... "Image file"),
             arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
         ]))
-        .subcommand(Command::new("distance").args(&[
-            arg!(<FILE> "RGB file, generate by get-color command"),
-            arg!(--"read-only" "No write, just read"),
-        ]))
+        .subcommand(
+            Command::new("distance")
+                .args(&[
+                    arg!(<FILE> "RGB file, generate by get-color command"),
+                    arg!(--"read-only" "No write, just read"),
+                ])
+                .hide(cfg!(feature = "distance")),
+        )
         .get_matches();
 
     TEST_MODE.store(
@@ -244,7 +284,7 @@ fn main() -> anyhow::Result<()> {
             &matches.get_many("FILE").unwrap(),
             matches.get_one("output"),
         ),
-        Some(("distance", matches)) => calc_color_distance(
+        Some(("distance", matches)) => distance::calc_color_distance(
             matches.get_one("FILE").unwrap(),
             matches.get_flag("read-only"),
         ),

@@ -15,7 +15,7 @@ impl Matcher {
     }
 
     pub(crate) fn check(&self, pixel: &BasicImageType) -> bool {
-        if self.use_diff {
+        if !self.use_diff {
             return self.template.iter().any(|x| x == pixel);
         }
         let pixel = RGB2::from(pixel);
