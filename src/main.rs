@@ -1,5 +1,6 @@
 mod configure;
 mod definitions;
+mod impls;
 mod matcher;
 mod target_5e;
 mod target_main;
@@ -14,14 +15,16 @@ use std::{
 
 use clap::{Command, arg};
 use configure::{Configure, Point};
-use enigo::{Enigo, Mouse};
 use image::{DynamicImage, ImageBuffer, Rgb};
 use rayon::iter::ParallelIterator;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
 use tools::{load_and_display, test_image, timestamp_fmt};
 use xcap::Monitor;
 
-use crate::matcher::Matcher;
+use crate::{
+    impls::{get_pos, move_mouse_click},
+    matcher::Matcher,
+};
 
 #[cfg(feature = "distance")]
 mod distance;
@@ -199,32 +202,20 @@ pub(crate) fn check_image_match(
 }
 
 fn display_mouse() -> anyhow::Result<()> {
-    let eg = enigo::Enigo::new(&enigo::Settings::default())?;
-    let mut prev_x = 0;
-    let mut prev_y = 0;
-
-    loop {
-        let (x, y) = eg.location()?;
-        if prev_x != x || prev_y != y {
-            println!("x: {x}, y: {y}");
-            prev_x = x;
-            prev_y = y;
-        }
-        sleep(Duration::from_millis(100));
-    }
+    get_pos()
 }
 
-fn handle_target(point: Option<Point>, template: &Matcher, eg: &mut Enigo) -> anyhow::Result<bool> {
+fn handle_target(point: Option<Point>, template: &Matcher) -> anyhow::Result<bool> {
     if let SearchResult::Found(pos1, pos2) =
         check_image_match(point, template.use_diff(), template)?
     {
         log::debug!("move mouse: x: {pos1}, y: {pos2}");
-        eg.move_mouse(pos1 as i32, pos2 as i32, enigo::Coordinate::Abs)?;
-        if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            eg.button(enigo::Button::Left, enigo::Direction::Click)?;
-            sleep(Duration::from_secs(1));
-            eg.button(enigo::Button::Left, enigo::Direction::Click)?;
-        }
+        move_mouse_click(
+            pos1 as i32,
+            pos2 as i32,
+            TEST_MODE.load(std::sync::atomic::Ordering::Relaxed),
+        )?;
+
         return Ok(true);
     }
 
@@ -246,7 +237,6 @@ fn real_main(config: &String) -> anyhow::Result<()> {
     let mut sys = sysinfo::System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
-    let mut eg = Enigo::new(&enigo::Settings::default())?;
 
     log::info!("Starting listening");
 
@@ -256,7 +246,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match 5e     ");
-                handle_target(config.e5(), &target_5e::MATCH_TEMPLATE, &mut eg)?;
+                handle_target(config.e5(), &target_5e::MATCH_TEMPLATE)?;
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("User is playing     ");
@@ -269,7 +259,7 @@ fn real_main(config: &String) -> anyhow::Result<()> {
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
-                handle_target(config.cs2(), &target_main::MATCH_TEMPLATE, &mut eg)?;
+                handle_target(config.cs2(), &target_main::MATCH_TEMPLATE)?;
             }
             CheckResult::NoNeedProcess => {
                 unimplemented!()
