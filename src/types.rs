@@ -36,7 +36,7 @@ impl Point {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct MatchOptions {
     force_distance: bool,
     limit_x: usize,

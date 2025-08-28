@@ -149,7 +149,7 @@ fn test_area(functions: &str, force_distance: bool, save_image: bool) -> anyhow:
             if save_image {
                 area.save(format!(
                     "{}-{ret}.png",
-                    timestamp_fmt("%Y-%m-%d_%H-%M-%S-%.3f")
+                    timestamp_fmt("%Y-%m-%d_%H-%M-%S-%3f")
                 ))?;
             }
         }

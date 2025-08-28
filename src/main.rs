@@ -46,7 +46,7 @@ const Y_LIMIT: usize = 8;
 
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
-        print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S.%.3f] "));
+        print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S.%3f] "));
         print!($($arg)*);
         print!("\r");
         {
@@ -120,7 +120,7 @@ fn screen_cap(point: PointOption, is_5e: bool) -> anyhow::Result<(Point, ImageTy
         //return Ok(DynamicImage::from(image).into_rgb8());
         log::trace!("elapsed: {:?}", start.elapsed());
         if SAVE_IMAGE.load(std::sync::atomic::Ordering::Relaxed) {
-            image.save(format!("{}.png", timestamp_fmt("%Y-%m-%d_%H-%M-%S")))?;
+            image.save(format!("{}.png", timestamp_fmt("%Y-%m-%d_%H-%M-%S-%3f")))?;
         }
         return Ok((real_point, DynamicImage::from(image).into_rgb8()));
     }
@@ -278,7 +278,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             CheckResult::Next => {}
         }
 
-        match target_main::check_primary_exec(sys.processes()) {
+        match target_main::check_primary_exec(sys.processes())? {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
                 let ret = check_image_match(
