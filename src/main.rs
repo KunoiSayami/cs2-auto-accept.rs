@@ -290,7 +290,8 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
-                unimplemented!()
+                print_inline!("Not searching");
+                sleep_until_exit!(16);
             }
             CheckResult::Next => {}
         }
