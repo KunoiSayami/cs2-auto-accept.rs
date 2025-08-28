@@ -23,7 +23,7 @@ use xcap::Monitor;
 
 use crate::{
     impls::{get_pos, move_mouse_click},
-    matcher::Matcher,
+    matcher::{Matcher, OVERRIDE_USE_DISTANCE},
 };
 
 #[cfg(feature = "distance")]
@@ -306,9 +306,11 @@ fn main() -> anyhow::Result<()> {
                 ])
                 .hide(cfg!(feature = "distance")),
         )
-        .subcommand(
-            Command::new("test").args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
-        )
+        .subcommand(Command::new("test").args(&[
+            arg!(<FILE> "Test image"),
+            arg!(--"5e" "Enable 5e match"),
+            arg!(--"force-distance" "Use distance algorithm to check image"),
+        ]))
         .get_matches();
 
     if matches.get_flag("dry-run") {
@@ -332,6 +334,10 @@ fn main() -> anyhow::Result<()> {
             matches.get_flag("read-only"),
         ),
         Some(("test", matches)) => {
+            OVERRIDE_USE_DISTANCE.store(
+                matches.get_flag("force-distance"),
+                std::sync::atomic::Ordering::Relaxed,
+            );
             test_image(matches.get_one("FILE").unwrap(), matches.get_flag("5e"))
         }
         _ => real_main(matches.get_one("CONFIG").unwrap()),

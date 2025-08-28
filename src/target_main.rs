@@ -8,6 +8,7 @@ use crate::{CheckResult, definitions::PROCESS_NAME, matcher::Matcher};
 pub(crate) const MATCH_TEMPLATE: Matcher = Matcher::new(
     false,
     &[Rgb([52, 182, 81]), Rgb([54, 183, 82]), Rgb([58, 198, 90])],
+    20.0,
 );
 
 #[must_use]
