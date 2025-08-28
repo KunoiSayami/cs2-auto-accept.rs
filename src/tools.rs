@@ -4,7 +4,9 @@ use chrono::Local;
 use clap::parser::ValuesRef;
 use image::Rgb;
 
-use crate::{X_LIMIT, Y_LIMIT, configure::Point, match_algorithm, process_area};
+use crate::{
+    X_LIMIT, Y_LIMIT, configure::Point, match_algorithm, process_area, types::MatchOptions,
+};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Default)]
 pub(crate) struct RGB2 {
@@ -93,8 +95,10 @@ pub(crate) fn timestamp_fmt(fmt: &str) -> String {
     Local::now().format(fmt).to_string()
 }
 
-pub(crate) fn test_image(file: &String, is_5e: bool) -> anyhow::Result<()> {
+pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> anyhow::Result<()> {
     let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
+
+    let opts = MatchOptions::new(force_distance, crate::X_LIMIT, crate::Y_LIMIT);
 
     let (buff, count) = process_area(
         &image,
@@ -103,13 +107,14 @@ pub(crate) fn test_image(file: &String, is_5e: bool) -> anyhow::Result<()> {
         } else {
             &crate::target_main::MATCH_TEMPLATE
         },
+        opts,
     );
     if count < X_LIMIT * Y_LIMIT {
         println!("Early exit {count}");
         return Ok(());
     }
     let (x, y) = image.dimensions();
-    let ret = match_algorithm(Point::new(0, 0, x as i32, y as i32), &buff, (x, y));
+    let ret = match_algorithm(Point::new(0, 0, x as i32, y as i32), &buff, (x, y), opts);
     println!("{ret:?}");
     Ok(())
 }

@@ -5,6 +5,7 @@ mod matcher;
 mod target_5e;
 mod target_main;
 mod tools;
+mod types;
 
 use std::{
     io::Write,
@@ -23,7 +24,8 @@ use xcap::Monitor;
 
 use crate::{
     impls::{get_pos, move_mouse_click},
-    matcher::{Matcher, OVERRIDE_USE_DISTANCE},
+    matcher::Matcher,
+    types::MatchOptions,
 };
 
 #[cfg(feature = "distance")]
@@ -124,7 +126,11 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
     Err(anyhow::anyhow!("Not found primary monitor"))
 }
 
-fn process_area(area: &ImageType, template: &Matcher) -> (Vec<Vec<bool>>, usize) {
+fn process_area(
+    area: &ImageType,
+    template: &Matcher,
+    options: MatchOptions,
+) -> (Vec<Vec<bool>>, usize) {
     let (pic_x, pic_y) = area.dimensions();
     let mut buff = vec![vec![false; pic_y as usize]; pic_x as usize];
     let iter = area.par_enumerate_pixels();
@@ -135,7 +141,7 @@ fn process_area(area: &ImageType, template: &Matcher) -> (Vec<Vec<bool>>, usize)
     iter.for_each_init(
         || sender.clone(),
         |s, (x, y, p)| {
-            if template.check(p) {
+            if template.check(p, options.force_distance()) {
                 s.send((x, y)).ok();
             }
         },
@@ -150,10 +156,15 @@ fn process_area(area: &ImageType, template: &Matcher) -> (Vec<Vec<bool>>, usize)
     (buff, count)
 }
 
-fn match_algorithm(point: Point, buff: &[Vec<bool>], (pic_x, pic_y): (u32, u32)) -> SearchResult {
-    let x_start = X_LIMIT / 2;
+fn match_algorithm(
+    point: Point,
+    buff: &[Vec<bool>],
+    (pic_x, pic_y): (u32, u32),
+    options: MatchOptions,
+) -> SearchResult {
+    let x_start = options.limit_x() / 2;
     let x_end = pic_x as usize - x_start;
-    let y_start = Y_LIMIT / 2;
+    let y_start = options.limit_y() / 2;
     let y_end = pic_y as usize - y_start;
 
     for x in x_start..x_end {
@@ -162,8 +173,8 @@ fn match_algorithm(point: Point, buff: &[Vec<bool>], (pic_x, pic_y): (u32, u32))
             let original_y = y - y_start;
             let mut r = true;
             //let mut matched = 0;
-            'outer: for buff in buff.iter().skip(original_x).take(X_LIMIT) {
-                for element in buff.iter().skip(original_y).take(Y_LIMIT) {
+            'outer: for buff in buff.iter().skip(original_x).take(options.limit_x()) {
+                for element in buff.iter().skip(original_y).take(options.limit_y()) {
                     if !*element {
                         /* if matched > 0 {
                             log::debug!("Matched: {matched}");
@@ -186,17 +197,18 @@ pub(crate) fn check_image_match(
     point: Option<Point>,
     is_5e: bool,
     template: &Matcher,
+    options: MatchOptions,
 ) -> anyhow::Result<SearchResult> {
     print_inline!("Capture screen             ");
     let (point, current_screen) = screen_cap(point, is_5e)?;
     print_inline!("Marking area into Vec<bool>");
-    let (buff, count) = process_area(&current_screen, template);
-    if count < X_LIMIT * Y_LIMIT {
+    let (buff, count) = process_area(&current_screen, template, options);
+    if count < options.limit_x() * options.limit_y() {
         return Ok(SearchResult::NotFound);
     }
     print_inline!("Checking point of interest");
     //let instant = Instant::now();
-    let ret = match_algorithm(point, &buff, current_screen.dimensions());
+    let ret = match_algorithm(point, &buff, current_screen.dimensions(), options);
     //log::debug!("elapsed: {:?}", instant.elapsed());
     Ok(ret)
 }
@@ -205,11 +217,9 @@ fn display_mouse() -> anyhow::Result<()> {
     get_pos()
 }
 
-fn handle_target(point: Option<Point>, template: &Matcher) -> anyhow::Result<bool> {
-    if let SearchResult::Found(pos1, pos2) =
-        check_image_match(point, template.use_diff(), template)?
-    {
-        log::debug!("move mouse: x: {pos1}, y: {pos2}");
+fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
+    if let SearchResult::Found(pos1, pos2) = result {
+        log::debug!("Mouse point: x: {pos1}, y: {pos2}");
         move_mouse_click(
             pos1 as i32,
             pos2 as i32,
@@ -232,11 +242,13 @@ fn sleep_until_exit(second: usize) -> bool {
     false
 }
 
-fn real_main(config: &String) -> anyhow::Result<()> {
+fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
     let config = Configure::load(config).unwrap_or_default();
     let mut sys = sysinfo::System::new_with_specifics(
         RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     );
+
+    let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
 
     log::info!("Starting listening");
 
@@ -246,7 +258,10 @@ fn real_main(config: &String) -> anyhow::Result<()> {
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match 5e     ");
-                handle_target(config.e5(), &target_5e::MATCH_TEMPLATE)?;
+
+                let ret =
+                    check_image_match(config.e5(), true, &target_5e::MATCH_TEMPLATE, options)?;
+                handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("User is playing     ");
@@ -259,7 +274,9 @@ fn real_main(config: &String) -> anyhow::Result<()> {
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
-                handle_target(config.cs2(), &target_main::MATCH_TEMPLATE)?;
+                let ret =
+                    check_image_match(config.cs2(), false, &target_main::MATCH_TEMPLATE, options)?;
+                handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
                 unimplemented!()
@@ -278,6 +295,18 @@ fn real_main(config: &String) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn real_main_guarder(config: &String, force_distance: bool) -> anyhow::Result<()> {
+    let mut err = None;
+    while EXIT_SIGNAL.get().is_none() {
+        if let Err(e) = real_main(config, force_distance)
+            .inspect_err(|e| log::error!("Main thread error: {e:?}"))
+        {
+            err.replace(e);
+        }
+    }
+    if let Some(e) = err { Err(e) } else { Ok(()) }
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::Builder::new()
         .filter_level(log::LevelFilter::Debug)
@@ -292,6 +321,7 @@ fn main() -> anyhow::Result<()> {
             arg!([CONFIG] "Configure file").default_value("config.toml"),
             arg!(--"dry-run" "Dry run (do not click)"),
             arg!(--"save-image" "Save image each time take"),
+            arg!(--"force-distance" "Use distance algorithm to check image"),
         ])
         .subcommand(Command::new("mouse"))
         .subcommand(Command::new("get-color").args(&[
@@ -306,11 +336,9 @@ fn main() -> anyhow::Result<()> {
                 ])
                 .hide(cfg!(feature = "distance")),
         )
-        .subcommand(Command::new("test").args(&[
-            arg!(<FILE> "Test image"),
-            arg!(--"5e" "Enable 5e match"),
-            arg!(--"force-distance" "Use distance algorithm to check image"),
-        ]))
+        .subcommand(
+            Command::new("test").args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
+        )
         .get_matches();
 
     if matches.get_flag("dry-run") {
@@ -333,13 +361,14 @@ fn main() -> anyhow::Result<()> {
             matches.get_one::<String>("FILE").unwrap(),
             matches.get_flag("read-only"),
         ),
-        Some(("test", matches)) => {
-            OVERRIDE_USE_DISTANCE.store(
-                matches.get_flag("force-distance"),
-                std::sync::atomic::Ordering::Relaxed,
-            );
-            test_image(matches.get_one("FILE").unwrap(), matches.get_flag("5e"))
-        }
-        _ => real_main(matches.get_one("CONFIG").unwrap()),
+        Some(("test", matches)) => test_image(
+            matches.get_one("FILE").unwrap(),
+            matches.get_flag("5e"),
+            matches.get_flag("force-distance"),
+        ),
+        _ => real_main_guarder(
+            matches.get_one("CONFIG").unwrap(),
+            matches.get_flag("force-distance"),
+        ),
     }
 }

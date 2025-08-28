@@ -1,20 +1,4 @@
-use std::sync::atomic::AtomicBool;
-
 use crate::{BasicImageType, tools::RGB2};
-
-pub(crate) static OVERRIDE_USE_DISTANCE: AtomicBool = AtomicBool::new(false);
-
-#[cfg(not(debug_assertions))]
-#[inline(always)]
-fn override_use() -> bool {
-    false
-}
-
-#[cfg(debug_assertions)]
-#[inline(always)]
-fn override_use() -> bool {
-    OVERRIDE_USE_DISTANCE.load(std::sync::atomic::Ordering::Relaxed)
-}
 
 pub(crate) struct Matcher {
     use_diff: bool,
@@ -35,12 +19,8 @@ impl Matcher {
         }
     }
 
-    pub(crate) fn use_diff(&self) -> bool {
-        self.use_diff
-    }
-
-    pub(crate) fn check(&self, pixel: &BasicImageType) -> bool {
-        if !self.use_diff && !override_use() {
+    pub(crate) fn check(&self, pixel: &BasicImageType, force_distance: bool) -> bool {
+        if !self.use_diff && !force_distance {
             //let ret = ;
             //println!("{pixel:?} {ret:?}");
             return self.template.iter().any(|x| x == pixel);
