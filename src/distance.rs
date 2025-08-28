@@ -46,6 +46,7 @@ fn only_read() -> anyhow::Result<()> {
     let reader = BufReader::new(file);
     let lines = reader.lines();
     let mut v = vec![];
+
     for line in lines {
         let line = line?;
         let l = line.split(", ").collect::<Vec<&str>>();
@@ -60,6 +61,7 @@ fn only_read() -> anyhow::Result<()> {
         });
     }
     v.sort_by(|x, y| x.middle.partial_cmp(&y.middle).unwrap());
+    println!("R G B Max Min Middle Middle+10 Middle-10");
     for x in &v[..10] {
         println!("{x} {}", (x.middle_10 - x.middle_n10).abs());
     }

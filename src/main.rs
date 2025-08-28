@@ -14,18 +14,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-use clap::{Command, arg};
-use configure::{Configure, Point};
+use clap::{Command, arg, builder::PossibleValue};
+use configure::Configure;
 use image::{DynamicImage, ImageBuffer, Rgb};
 use rayon::iter::ParallelIterator;
 use sysinfo::{ProcessRefreshKind, RefreshKind};
-use tools::{load_and_display, test_image, timestamp_fmt};
+use tools::{continue_test_area, load_and_display, test_image, timestamp_fmt};
 use xcap::Monitor;
 
 use crate::{
     impls::{get_pos, move_mouse_click},
     matcher::Matcher,
-    types::MatchOptions,
+    types::{MatchOptions, Point, PointOption},
 };
 
 #[cfg(feature = "distance")]
@@ -46,7 +46,7 @@ const Y_LIMIT: usize = 8;
 
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
-        print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S] "));
+        print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S.%.3f] "));
         print!($($arg)*);
         print!("\r");
         {
@@ -95,7 +95,7 @@ fn determine_point(monitor: Monitor, is_5e: bool) -> anyhow::Result<Point> {
     Ok(Point::new(mid_x - w, mid_y - h, mid_x + w, mid_y + h))
 }
 
-fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, ImageType)> {
+fn screen_cap(point: PointOption, is_5e: bool) -> anyhow::Result<(Point, ImageType)> {
     let start = Instant::now();
     let monitors = Monitor::all().unwrap();
 
@@ -104,8 +104,9 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
             continue;
         }
         let real_point = match point {
-            Some(point) => point,
-            None => determine_point(monitor.clone(), is_5e)?,
+            PointOption::Some(point) => point,
+            PointOption::Transform(func) => func(monitor.clone()),
+            PointOption::None => determine_point(monitor.clone(), is_5e)?,
         };
 
         let image = monitor.capture_region(
@@ -126,6 +127,7 @@ fn screen_cap(point: Option<Point>, is_5e: bool) -> anyhow::Result<(Point, Image
     Err(anyhow::anyhow!("Not found primary monitor"))
 }
 
+#[must_use]
 fn process_area(
     area: &ImageType,
     template: &Matcher,
@@ -156,6 +158,7 @@ fn process_area(
     (buff, count)
 }
 
+#[must_use]
 fn match_algorithm(
     point: Point,
     buff: &[Vec<bool>],
@@ -194,7 +197,7 @@ fn match_algorithm(
 }
 
 pub(crate) fn check_image_match(
-    point: Option<Point>,
+    point: PointOption,
     is_5e: bool,
     template: &Matcher,
     options: MatchOptions,
@@ -259,8 +262,12 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             CheckResult::NeedProcess => {
                 print_inline!("Match 5e     ");
 
-                let ret =
-                    check_image_match(config.e5(), true, &target_5e::MATCH_TEMPLATE, options)?;
+                let ret = check_image_match(
+                    config.e5().into(),
+                    true,
+                    &target_5e::MATCH_TEMPLATE,
+                    options,
+                )?;
                 handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
@@ -274,8 +281,12 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
         match target_main::check_primary_exec(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
-                let ret =
-                    check_image_match(config.cs2(), false, &target_main::MATCH_TEMPLATE, options)?;
+                let ret = check_image_match(
+                    config.cs2().into(),
+                    false,
+                    &target_main::MATCH_TEMPLATE,
+                    options,
+                )?;
                 handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
@@ -313,7 +324,9 @@ fn main() -> anyhow::Result<()> {
         .filter_module("enigo", log::LevelFilter::Warn)
         .init();
     ctrlc::set_handler(|| {
-        EXIT_SIGNAL.set(true).unwrap();
+        EXIT_SIGNAL
+            .set(true)
+            .unwrap_or_else(|_| std::process::exit(1));
     })
     .unwrap();
     let matches = clap::command!()
@@ -339,6 +352,10 @@ fn main() -> anyhow::Result<()> {
         .subcommand(
             Command::new("test").args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
         )
+        .subcommand(Command::new("continue-match").args(&[
+            arg!(<function> "Functions to match").value_parser([PossibleValue::new("cs2-lobby")]),
+            arg!(--save "Save image"),
+        ]))
         .get_matches();
 
     if matches.get_flag("dry-run") {
@@ -350,7 +367,7 @@ fn main() -> anyhow::Result<()> {
         matches.get_flag("save-image"),
         std::sync::atomic::Ordering::Relaxed,
     );
-
+    let force_distance = matches.get_flag("force-distance");
     match matches.subcommand() {
         Some(("mouse", _)) => display_mouse(),
         Some(("get-color", matches)) => load_and_display(
@@ -364,11 +381,13 @@ fn main() -> anyhow::Result<()> {
         Some(("test", matches)) => test_image(
             matches.get_one("FILE").unwrap(),
             matches.get_flag("5e"),
-            matches.get_flag("force-distance"),
+            force_distance,
         ),
-        _ => real_main_guarder(
-            matches.get_one("CONFIG").unwrap(),
-            matches.get_flag("force-distance"),
+        Some(("continue-match", matches)) => continue_test_area(
+            matches.get_one::<String>("function").unwrap(),
+            force_distance,
+            matches.get_flag("save"),
         ),
+        _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }
 }

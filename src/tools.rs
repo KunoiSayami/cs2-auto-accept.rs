@@ -1,11 +1,13 @@
-use std::{collections::HashSet, fs::OpenOptions, io::Write};
+use std::{collections::HashSet, fs::OpenOptions, io::Write, thread::sleep, time::Duration};
 
 use chrono::Local;
 use clap::parser::ValuesRef;
 use image::Rgb;
+use xcap::Monitor;
 
 use crate::{
-    X_LIMIT, Y_LIMIT, configure::Point, match_algorithm, process_area, types::MatchOptions,
+    EXIT_SIGNAL, PointOption, X_LIMIT, Y_LIMIT, match_algorithm, process_area, screen_cap,
+    types::{MatchOptions, Point},
 };
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Default)]
@@ -116,5 +118,63 @@ pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> an
     let (x, y) = image.dimensions();
     let ret = match_algorithm(Point::new(0, 0, x as i32, y as i32), &buff, (x, y), opts);
     println!("{ret:?}");
+    Ok(())
+}
+
+fn test_area(functions: &str, force_distance: bool, save_image: bool) -> anyhow::Result<()> {
+    match functions {
+        "cs2-lobby" => {
+            let opts = MatchOptions::new(force_distance, crate::X_LIMIT, crate::Y_LIMIT);
+
+            let (point, area) = screen_cap(PointOption::Transform(get_right_upon_side), false)?;
+
+            let (buff, count) =
+                process_area(&area, &crate::target_main::LOBBY_MATCH_TEMPLATE, opts);
+            if count < X_LIMIT * Y_LIMIT {
+                log::debug!("False {count}");
+                return Ok(());
+            }
+
+            let ret = match match_algorithm(point, &buff, area.dimensions(), opts) {
+                crate::SearchResult::Found(x, y) => {
+                    log::debug!("true {x} {y}");
+                    true
+                }
+                crate::SearchResult::NotFound => {
+                    log::debug!("false");
+                    false
+                }
+            };
+
+            if save_image {
+                area.save(format!(
+                    "{}-{ret}.png",
+                    timestamp_fmt("%Y-%m-%d_%H-%M-%S-%.3f")
+                ))?;
+            }
+        }
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
+pub(crate) fn get_right_upon_side(monitor: Monitor) -> Point {
+    Point::new(
+        monitor.width().unwrap() as i32 - 30,
+        0,
+        monitor.width().unwrap() as i32,
+        16,
+    )
+}
+
+pub(crate) fn continue_test_area(
+    functions: &str,
+    force_distance: bool,
+    save_image: bool,
+) -> anyhow::Result<()> {
+    while EXIT_SIGNAL.get().is_none() {
+        test_area(functions, force_distance, save_image)?;
+        sleep(Duration::from_millis(250));
+    }
     Ok(())
 }
