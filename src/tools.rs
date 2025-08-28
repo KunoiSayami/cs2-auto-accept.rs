@@ -58,7 +58,7 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
     let mut set = HashSet::new();
     let mut output = vec![];
 
-    for file in p.clone().into_iter() {
+    for file in p.clone() {
         let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
 
         for (_, _, pixel) in image.enumerate_pixels() {

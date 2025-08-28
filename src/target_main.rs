@@ -16,5 +16,5 @@ pub(crate) fn check_primary_exec(process: &HashMap<Pid, Process>) -> CheckResult
     if process.values().any(|x| x.name().eq(PROCESS_NAME)) {
         return CheckResult::NeedProcess;
     }
-    return CheckResult::Next;
+    CheckResult::Next
 }

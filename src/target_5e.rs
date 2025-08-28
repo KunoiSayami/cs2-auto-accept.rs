@@ -21,5 +21,5 @@ pub(crate) fn check_need_handle(process: &HashMap<Pid, Process>) -> CheckResult 
         }
         return CheckResult::NeedProcess;
     }
-    return CheckResult::Next;
+    CheckResult::Next
 }

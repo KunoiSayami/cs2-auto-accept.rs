@@ -26,7 +26,7 @@ pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<
     SendInput(&[move_event])?;
 
     if is_test {
-        SendInput(&[press_event.clone(), release_event.clone()])?;
+        SendInput(&[press_event, release_event])?;
         sleep(Duration::from_secs(1));
         SendInput(&[press_event, release_event])?;
     }

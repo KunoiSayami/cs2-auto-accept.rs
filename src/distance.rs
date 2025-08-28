@@ -44,9 +44,9 @@ enum DataEvent {
 fn only_read() -> anyhow::Result<()> {
     let file = File::open("output.txt")?;
     let reader = BufReader::new(file);
-    let mut lines = reader.lines();
+    let lines = reader.lines();
     let mut v = vec![];
-    while let Some(line) = lines.next() {
+    for line in lines {
         let line = line?;
         let l = line.split(", ").collect::<Vec<&str>>();
         //println!("{l:?}");
@@ -96,11 +96,11 @@ fn write_thread(mut file: File, recv: Receiver<DataEvent>) -> anyhow::Result<()>
 
 fn load_rgb(file: &str) -> anyhow::Result<Vec<RGB2>> {
     let reader = BufReader::new(File::open(file)?);
-    let mut lines = reader.lines();
+    let lines = reader.lines();
 
     let mut v = vec![];
 
-    while let Some(line) = lines.next() {
+    for line in lines {
         let line = line?;
         let s = line.split(", ").collect::<Vec<_>>();
         v.push(RGB2::new(s[0].parse()?, s[1].parse()?, s[2].parse()?));
@@ -109,7 +109,7 @@ fn load_rgb(file: &str) -> anyhow::Result<Vec<RGB2>> {
     Ok(v)
 }
 
-pub(crate) fn calc_color_distance(input: &String, read_only: bool) -> anyhow::Result<()> {
+pub(crate) fn calc_color_distance(input: &str, read_only: bool) -> anyhow::Result<()> {
     if read_only {
         return only_read();
     }
@@ -152,7 +152,7 @@ fn inner_calc_color_distance(basic: RGB2, input: Arc<Vec<RGB2>>) -> RGB2Info {
     let mut min = f32::MAX;
     for other in input.iter() {
         //let other = RGB2::from(x);
-        let d = basic.distance(&other);
+        let d = basic.distance(other);
         max = max.max(d);
         min = min.min(d);
         v.push(d);

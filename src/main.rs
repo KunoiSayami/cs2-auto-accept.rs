@@ -156,15 +156,15 @@ fn match_algorithm(point: Point, buff: &[Vec<bool>], (pic_x, pic_y): (u32, u32))
     let y_start = Y_LIMIT / 2;
     let y_end = pic_y as usize - y_start;
 
-    for x in x_start..x_end as usize {
-        for y in y_start..y_end as usize {
+    for x in x_start..x_end {
+        for y in y_start..y_end {
             let original_x = x - x_start;
             let original_y = y - y_start;
             let mut r = true;
             //let mut matched = 0;
-            'outer: for x in original_x..(original_x + X_LIMIT) {
-                for y in original_y..(original_y + Y_LIMIT) {
-                    if !buff[x][y] {
+            'outer: for buff in buff.iter().skip(original_x).take(X_LIMIT) {
+                for element in buff.iter().skip(original_y).take(Y_LIMIT) {
+                    if !*element {
                         /* if matched > 0 {
                             log::debug!("Matched: {matched}");
                         } */
@@ -179,7 +179,7 @@ fn match_algorithm(point: Point, buff: &[Vec<bool>], (pic_x, pic_y): (u32, u32))
             }
         }
     }
-    return SearchResult::NotFound;
+    SearchResult::NotFound
 }
 
 pub(crate) fn check_image_match(
@@ -326,11 +326,11 @@ fn main() -> anyhow::Result<()> {
     match matches.subcommand() {
         Some(("mouse", _)) => display_mouse(),
         Some(("get-color", matches)) => load_and_display(
-            &matches.get_many("FILE").unwrap(),
+            &matches.get_many::<String>("FILE").unwrap(),
             matches.get_one("output"),
         ),
         Some(("distance", matches)) => distance::calc_color_distance(
-            matches.get_one("FILE").unwrap(),
+            matches.get_one::<String>("FILE").unwrap(),
             matches.get_flag("read-only"),
         ),
         Some(("test", matches)) => {
