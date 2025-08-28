@@ -1,15 +1,9 @@
 use std::{thread::sleep, time::Duration};
 
-use winsafe::{GetCursorPos, HwKbMouse, MOUSEINPUT, SendInput, co::MOUSEEVENTF};
+use winsafe::{GetCursorPos, HwKbMouse, MOUSEINPUT, SendInput, SetCursorPos, co::MOUSEEVENTF};
 
 pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<()> {
-    let move_event = HwKbMouse::Mouse(MOUSEINPUT {
-        dx: x,
-        dy: y,
-        dwFlags: MOUSEEVENTF::ABSOLUTE | MOUSEEVENTF::MOVE,
-        time: 10,
-        ..Default::default()
-    });
+    SetCursorPos(x, y)?;
 
     let press_event = HwKbMouse::Mouse(MOUSEINPUT {
         dwFlags: MOUSEEVENTF::LEFTDOWN,
@@ -19,13 +13,10 @@ pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<
 
     let release_event = HwKbMouse::Mouse(MOUSEINPUT {
         dwFlags: MOUSEEVENTF::LEFTUP,
-        time: 10,
         ..Default::default()
     });
 
-    SendInput(&[move_event])?;
-
-    if is_test {
+    if !is_test {
         SendInput(&[press_event, release_event])?;
         sleep(Duration::from_secs(1));
         SendInput(&[press_event, release_event])?;

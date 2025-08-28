@@ -121,7 +121,12 @@ pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> an
     Ok(())
 }
 
-fn test_area(functions: &str, force_distance: bool, save_image: bool) -> anyhow::Result<()> {
+fn test_area(
+    functions: &str,
+    force_distance: bool,
+    save_image: bool,
+    failed_only: bool,
+) -> anyhow::Result<()> {
     match functions {
         "cs2-lobby" => {
             let opts = MatchOptions::new(force_distance, crate::X_LIMIT, crate::Y_LIMIT);
@@ -146,7 +151,7 @@ fn test_area(functions: &str, force_distance: bool, save_image: bool) -> anyhow:
                 }
             };
 
-            if save_image {
+            if save_image && (!failed_only || !ret) {
                 area.save(format!(
                     "{}-{ret}.png",
                     timestamp_fmt("%Y-%m-%d_%H-%M-%S-%3f")
@@ -171,9 +176,10 @@ pub(crate) fn continue_test_area(
     functions: &str,
     force_distance: bool,
     save_image: bool,
+    failed_only: bool,
 ) -> anyhow::Result<()> {
     while EXIT_SIGNAL.get().is_none() {
-        test_area(functions, force_distance, save_image)?;
+        test_area(functions, force_distance, save_image, failed_only)?;
         sleep(Duration::from_millis(250));
     }
     Ok(())

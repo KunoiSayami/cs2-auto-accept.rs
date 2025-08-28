@@ -6,7 +6,7 @@ pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<
     let mut eg = Enigo::new(&Default::default())?;
     eg.move_mouse(x, y, enigo::Coordinate::Abs)?;
 
-    if is_test {
+    if !is_test {
         eg.button(enigo::Button::Left, enigo::Direction::Click)?;
         sleep(Duration::from_secs(1));
         eg.button(enigo::Button::Left, enigo::Direction::Click)?;

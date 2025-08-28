@@ -207,6 +207,7 @@ pub(crate) fn check_image_match(
     print_inline!("Marking area into Vec<bool>");
     let (buff, count) = process_area(&current_screen, template, options);
     if count < options.limit_x() * options.limit_y() {
+        //log::debug!("Early exit");
         return Ok(SearchResult::NotFound);
     }
     print_inline!("Checking point of interest");
@@ -281,6 +282,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
         match target_main::check_primary_exec(sys.processes())? {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
+                //log::debug!("Check cs main");
                 let ret = check_image_match(
                     config.cs2().into(),
                     false,
@@ -292,6 +294,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             CheckResult::NoNeedProcess => {
                 print_inline!("Not searching");
                 sleep_until_exit!(16);
+                continue;
             }
             CheckResult::Next => {}
         }
@@ -356,6 +359,7 @@ fn main() -> anyhow::Result<()> {
         .subcommand(Command::new("continue-match").args(&[
             arg!(<function> "Functions to match").value_parser([PossibleValue::new("cs2-lobby")]),
             arg!(--save "Save image"),
+            arg!(--"save-failed" "Save image failed only"),
         ]))
         .get_matches();
 
@@ -388,6 +392,7 @@ fn main() -> anyhow::Result<()> {
             matches.get_one::<String>("function").unwrap(),
             force_distance,
             matches.get_flag("save"),
+            matches.get_flag("save-failed"),
         ),
         _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }
