@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Write},
     sync::{
@@ -7,6 +8,8 @@ use std::{
     },
     thread::spawn,
 };
+
+use clap::parser::ValuesRef;
 
 use crate::tools::RGB2;
 
@@ -70,8 +73,7 @@ fn only_read() -> anyhow::Result<()> {
 }
 
 fn write_thread(mut file: File, recv: Receiver<DataEvent>) -> anyhow::Result<()> {
-    let mut mid = f32::MAX;
-    let mut basic = RGB2Info::default();
+    let mut v = Vec::with_capacity(11);
 
     while let Ok(event) = recv.recv() {
         match event {
@@ -81,22 +83,42 @@ fn write_thread(mut file: File, recv: Receiver<DataEvent>) -> anyhow::Result<()>
                     diff = rgb2_info.diff();
                     max = rgb2_info.max;
                 } */
-                if rgb2_info.middle < mid {
-                    basic = rgb2_info;
-                    mid = rgb2_info.middle;
-                }
                 let mut s = rgb2_info.to_string();
                 s.push('\n');
                 file.write_all(s.as_bytes())?;
+                v.push(rgb2_info);
+                v.sort_unstable_by(|v, other| v.middle.partial_cmp(&other.middle).unwrap());
+                if v.len() > 10 {
+                    v.pop();
+                }
             }
             DataEvent::Close => break,
         }
     }
-    println!("{basic}");
+    for x in &v {
+        println!("{x} {}", (x.middle_10 - x.middle_n10).abs());
+    }
     Ok(())
 }
 
-fn load_rgb(file: &str) -> anyhow::Result<Vec<RGB2>> {
+fn load_image(file: &str) -> anyhow::Result<Vec<RGB2>> {
+    let mut set = HashSet::new();
+    let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
+
+    for (_, _, pixel) in image.enumerate_pixels() {
+        let p = RGB2::from(pixel);
+
+        set.insert(p);
+        //println!("{},{},{}", pixel.0[0], pixel.0[1], pixel.0[2]);
+    }
+
+    Ok(set.into_iter().collect())
+}
+
+fn load_rgb(file: &str, is_txt: bool) -> anyhow::Result<Vec<RGB2>> {
+    if is_txt {
+        return load_image(file);
+    }
     let reader = BufReader::new(File::open(file)?);
     let lines = reader.lines();
 
@@ -111,30 +133,38 @@ fn load_rgb(file: &str) -> anyhow::Result<Vec<RGB2>> {
     Ok(v)
 }
 
-pub(crate) fn calc_color_distance(input: &str, read_only: bool) -> anyhow::Result<()> {
+pub(crate) fn calc_color_distance(
+    files: ValuesRef<'_, String>,
+    output: &str,
+    read_only: bool,
+    is_txt: bool,
+) -> anyhow::Result<()> {
     if read_only {
         return only_read();
     }
-    let input = Arc::new(load_rgb(input)?);
     let file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open("output.txt")?;
+        .open(output)?;
     let (s, r) = channel();
     let tr = spawn(move || write_thread(file, r));
     let pool = threadpool::Builder::new().build();
 
-    for r in 0..=255 {
-        for g in 128..=255 {
-            for b in 0..50 {
-                let basic = RGB2::new(r, g, b);
-                let sender = s.clone();
-                let input = input.clone();
-                pool.execute(move || {
-                    let ret = inner_calc_color_distance(basic, input);
-                    sender.send(DataEvent::New(ret)).unwrap();
-                });
+    for file in files.into_iter() {
+        let input = Arc::new(load_rgb(file, is_txt)?);
+
+        for r in 0..=128 {
+            for g in 128..=255 {
+                for b in 0..128 {
+                    let basic = RGB2::new(r, g, b);
+                    let sender = s.clone();
+                    let input = input.clone();
+                    pool.execute(move || {
+                        let ret = inner_calc_color_distance(basic, input);
+                        sender.send(DataEvent::New(ret)).unwrap();
+                    });
+                }
             }
         }
     }

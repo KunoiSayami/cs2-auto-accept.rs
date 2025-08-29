@@ -135,20 +135,22 @@ fn test_area(
 
             let (buff, count) =
                 process_area(&area, &crate::target_main::LOBBY_MATCH_TEMPLATE, opts);
-            if count < X_LIMIT * Y_LIMIT {
-                log::debug!("False {count}");
-                return Ok(());
-            }
+            let early = count < X_LIMIT * Y_LIMIT;
 
-            let ret = match match_algorithm(point, &buff, area.dimensions(), opts) {
-                crate::SearchResult::Found(x, y) => {
-                    log::debug!("true {x} {y}");
-                    true
+            let ret = if !early {
+                match match_algorithm(point, &buff, area.dimensions(), opts) {
+                    crate::SearchResult::Found(x, y) => {
+                        log::debug!("true {x} {y}");
+                        true
+                    }
+                    crate::SearchResult::NotFound => {
+                        log::debug!("false");
+                        false
+                    }
                 }
-                crate::SearchResult::NotFound => {
-                    log::debug!("false");
-                    false
-                }
+            } else {
+                log::debug!("false {count}");
+                false
             };
 
             if save_image && (!failed_only || !ret) {

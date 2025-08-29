@@ -1,7 +1,7 @@
 mod configure;
 mod definitions;
-mod impls;
 mod matcher;
+mod platform_impl;
 mod target_5e;
 mod target_main;
 mod tools;
@@ -23,8 +23,8 @@ use tools::{continue_test_area, load_and_display, test_image, timestamp_fmt};
 use xcap::Monitor;
 
 use crate::{
-    impls::{get_pos, move_mouse_click},
     matcher::Matcher,
+    platform_impl::{get_pos, move_mouse_click},
     types::{MatchOptions, Point, PointOption},
 };
 
@@ -32,7 +32,12 @@ use crate::{
 mod distance;
 #[cfg(not(feature = "distance"))]
 mod distance {
-    pub(crate) fn calc_color_distance(_: &String, _: bool) -> ! {
+    pub(crate) fn calc_color_distance(
+        _: clap::parser::ValuesRef<'_, String>,
+        _: &String,
+        _: bool,
+        _: bool,
+    ) -> ! {
         unimplemented!("To use this function, enable \"distance\" feature")
     }
 }
@@ -340,27 +345,45 @@ fn main() -> anyhow::Result<()> {
             arg!(--"save-image" "Save image each time take"),
             arg!(--"force-distance" "Use distance algorithm to check image"),
         ])
-        .subcommand(Command::new("mouse"))
-        .subcommand(Command::new("get-color").args(&[
-            arg!(<FILE> ... "Image file"),
-            arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
-        ]))
+        .subcommand(Command::new("mouse").about("Display current mouse position"))
+        .subcommand(
+            Command::new("get-color")
+                .about("Get RGB list from image file")
+                .args(&[
+                    arg!(<FILE> ... "Image file"),
+                    arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
+                ]),
+        )
         .subcommand(
             Command::new("distance")
+                .about("Find best color for image file")
                 .args(&[
-                    arg!(<FILE> "RGB file, generate by get-color command"),
+                    arg!(<FILE> ... "RGB file, generate by get-color command"),
+                    arg!(-d --direct "Process file direct as image"),
                     arg!(--"read-only" "No write, just read"),
+                    arg!(--output <output> "Output result to file").default_value("output.txt"),
                 ])
                 .hide(cfg!(feature = "distance")),
         )
         .subcommand(
-            Command::new("test").args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
+            Command::new("test")
+                .about("Test image is match specify matcher")
+                .args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
         )
-        .subcommand(Command::new("continue-match").args(&[
-            arg!(<function> "Functions to match").value_parser([PossibleValue::new("cs2-lobby")]),
-            arg!(--save "Save image"),
-            arg!(--"save-failed" "Save image failed only"),
-        ]))
+        .subcommand(
+            Command::new("continue-match")
+                .about("Help subcommand for debug match current screen and output")
+                .args(&[
+                    arg!(<function> "Functions to match")
+                        .value_parser([PossibleValue::new("cs2-lobby")]),
+                    arg!(<interval> "Fetch interval(ms)")
+                        .default_value("250")
+                        .value_parser(clap::value_parser!(u64)),
+                    arg!(--save <failed_only> "Save image")
+                        .default_value("false")
+                        .value_parser(clap::value_parser!(bool)),
+                ]),
+        )
         .get_matches();
 
     if matches.get_flag("dry-run") {
@@ -380,8 +403,10 @@ fn main() -> anyhow::Result<()> {
             matches.get_one("output"),
         ),
         Some(("distance", matches)) => distance::calc_color_distance(
-            matches.get_one::<String>("FILE").unwrap(),
+            matches.get_many::<String>("FILE").unwrap(),
+            matches.get_one::<String>("output").unwrap(),
             matches.get_flag("read-only"),
+            !matches.get_flag("direct"),
         ),
         Some(("test", matches)) => test_image(
             matches.get_one("FILE").unwrap(),
@@ -392,7 +417,7 @@ fn main() -> anyhow::Result<()> {
             matches.get_one::<String>("function").unwrap(),
             force_distance,
             matches.get_flag("save"),
-            matches.get_flag("save-failed"),
+            *matches.get_one("failed_only").unwrap(),
         ),
         _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }
