@@ -149,22 +149,26 @@ pub(crate) fn calc_color_distance(
         .open(output)?;
     let (s, r) = channel();
     let tr = spawn(move || write_thread(file, r));
+
     let pool = threadpool::Builder::new().build();
 
-    for file in files.into_iter() {
-        let input = Arc::new(load_rgb(file, is_txt)?);
+    let mut colors = Vec::new();
 
-        for r in 0..=128 {
-            for g in 128..=255 {
-                for b in 0..128 {
-                    let basic = RGB2::new(r, g, b);
-                    let sender = s.clone();
-                    let input = input.clone();
-                    pool.execute(move || {
-                        let ret = inner_calc_color_distance(basic, input);
-                        sender.send(DataEvent::New(ret)).unwrap();
-                    });
-                }
+    for file in files.into_iter() {
+        colors.append(&mut load_rgb(file, is_txt)?);
+    }
+    let input = Arc::new(colors);
+
+    for r in 0..=128 {
+        for g in 70..=255 {
+            for b in 0..=128 {
+                let basic = RGB2::new(r, g, b);
+                let sender = s.clone();
+                let input = input.clone();
+                pool.execute(move || {
+                    let ret = inner_calc_color_distance(basic, input);
+                    sender.send(DataEvent::New(ret)).unwrap();
+                });
             }
         }
     }

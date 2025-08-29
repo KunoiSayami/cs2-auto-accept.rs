@@ -297,7 +297,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 handle_target(ret)?;
             }
             CheckResult::NoNeedProcess => {
-                print_inline!("Not searching");
+                print_inline!("Not searching              ");
                 sleep_until_exit!(16);
                 continue;
             }
@@ -341,7 +341,7 @@ fn main() -> anyhow::Result<()> {
     let matches = clap::command!()
         .args(&[
             arg!([CONFIG] "Configure file").default_value("config.toml"),
-            arg!(--"dry-run" "Dry run (do not click)"),
+            arg!(-n --"dry-run" "Dry run (do not click)"),
             arg!(--"save-image" "Save image each time take"),
             arg!(--"force-distance" "Use distance algorithm to check image"),
         ])
@@ -376,7 +376,7 @@ fn main() -> anyhow::Result<()> {
                 .args(&[
                     arg!(<function> "Functions to match")
                         .value_parser([PossibleValue::new("cs2-lobby")]),
-                    arg!(<interval> "Fetch interval(ms)")
+                    arg!([interval] "Fetch interval(ms)")
                         .default_value("250")
                         .value_parser(clap::value_parser!(u64)),
                     arg!(--save <failed_only> "Save image")
@@ -417,7 +417,8 @@ fn main() -> anyhow::Result<()> {
             matches.get_one::<String>("function").unwrap(),
             force_distance,
             matches.get_flag("save"),
-            *matches.get_one("failed_only").unwrap(),
+            *matches.get_one("save").unwrap(),
+            *matches.get_one("interval").unwrap(),
         ),
         _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }

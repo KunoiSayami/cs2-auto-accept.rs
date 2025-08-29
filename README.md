@@ -1,7 +1,7 @@
 # CS2 auto accept
 
-> [!WARNING]
-> Use this software may cause your account getting banned
+> [!CAUTION]
+> Use this software may cause your account getting banned.
 
 > [!NOTE]
 > By playing Competitive you are committing to a full match which could last up to 90 minutes. Abandoning the match after you 'ACCEPT' will result in a penalty.

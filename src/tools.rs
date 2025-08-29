@@ -129,13 +129,13 @@ fn test_area(
 ) -> anyhow::Result<()> {
     match functions {
         "cs2-lobby" => {
-            let opts = MatchOptions::new(force_distance, crate::X_LIMIT, crate::Y_LIMIT);
+            let opts = MatchOptions::new(force_distance, 2, 2);
 
             let (point, area) = screen_cap(PointOption::Transform(get_right_upon_side), false)?;
 
             let (buff, count) =
                 process_area(&area, &crate::target_main::LOBBY_MATCH_TEMPLATE, opts);
-            let early = count < X_LIMIT * Y_LIMIT;
+            let early = count < 2 * 2;
 
             let ret = if !early {
                 match match_algorithm(point, &buff, area.dimensions(), opts) {
@@ -167,10 +167,10 @@ fn test_area(
 
 pub(crate) fn get_right_upon_side(monitor: Monitor) -> Point {
     Point::new(
-        monitor.width().unwrap() as i32 - 30,
+        monitor.width().unwrap() as i32 - 50,
         0,
         monitor.width().unwrap() as i32,
-        16,
+        20,
     )
 }
 
@@ -179,10 +179,11 @@ pub(crate) fn continue_test_area(
     force_distance: bool,
     save_image: bool,
     failed_only: bool,
+    interval: u64,
 ) -> anyhow::Result<()> {
     while EXIT_SIGNAL.get().is_none() {
         test_area(functions, force_distance, save_image, failed_only)?;
-        sleep(Duration::from_millis(250));
+        sleep(Duration::from_millis(interval));
     }
     Ok(())
 }

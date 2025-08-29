@@ -7,6 +7,7 @@ pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<
     eg.move_mouse(x, y, enigo::Coordinate::Abs)?;
 
     if !is_test {
+        sleep(Duration::from_millis(50));
         eg.button(enigo::Button::Left, enigo::Direction::Click)?;
         sleep(Duration::from_secs(1));
         eg.button(enigo::Button::Left, enigo::Direction::Click)?;
