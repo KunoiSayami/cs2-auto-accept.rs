@@ -1,0 +1,5 @@
+[interval]
+handle-success = 2
+loop = 3
+cs2-wait = 15
+5e-wait = 20

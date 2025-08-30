@@ -238,7 +238,7 @@ fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
     Ok(false)
 }
 
-fn sleep_until_exit(second: usize) -> bool {
+fn sleep_until_exit(second: u64) -> bool {
     for _ in 0..(second * 2) {
         if EXIT_SIGNAL.get().is_some() {
             return true;
@@ -272,13 +272,13 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                     options,
                 )?;
                 if handle_target(ret)? {
-                    sleep_until_exit!(2);
+                    sleep_until_exit!(config.interval().handle_success());
                     continue;
                 }
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("User is playing     ");
-                sleep_until_exit!(60);
+                sleep_until_exit!(config.interval().e5_wait());
                 continue;
             }
             CheckResult::Next => {}
@@ -295,13 +295,13 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                     options,
                 )?;
                 if handle_target(ret)? {
-                    sleep_until_exit!(2);
+                    sleep_until_exit!(config.interval().handle_success());
                     continue;
                 }
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("Not searching              ");
-                sleep_until_exit!(16);
+                sleep_until_exit!(config.interval().cs2_wait());
                 continue;
             }
             CheckResult::Next => {}
@@ -309,7 +309,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
         //log::debug!("Next tick");
         print_inline!("Sleep                      ");
         if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            sleep_until_exit!(3);
+            sleep_until_exit!(config.interval().each());
         } else {
             sleep_until_exit!(2);
         }
