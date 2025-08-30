@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 
 [build-dependencies]
@@ -35,3 +35,4 @@ winsafe = { version = "0.0.25", features = ["user"] }
 
 [features]
 distance = ["threadpool"]
+jpeg = ["image/jpeg"]

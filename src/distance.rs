@@ -160,7 +160,7 @@ pub(crate) fn calc_color_distance(
     let input = Arc::new(colors);
 
     for r in 0..=128 {
-        for g in 70..=255 {
+        for g in 50..=255 {
             for b in 0..=128 {
                 let basic = RGB2::new(r, g, b);
                 let sender = s.clone();

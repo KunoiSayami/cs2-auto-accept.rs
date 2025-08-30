@@ -1,6 +1,7 @@
 mod configure;
 mod definitions;
 mod matcher;
+mod not_impl;
 mod platform_impl;
 mod target_5e;
 mod target_main;
@@ -30,17 +31,12 @@ use crate::{
 
 #[cfg(feature = "distance")]
 mod distance;
-#[cfg(not(feature = "distance"))]
-mod distance {
-    pub(crate) fn calc_color_distance(
-        _: clap::parser::ValuesRef<'_, String>,
-        _: &String,
-        _: bool,
-        _: bool,
-    ) -> ! {
-        unimplemented!("To use this function, enable \"distance\" feature")
-    }
-}
+
+#[cfg(feature = "jpeg")]
+use crate::matcher::dir_match;
+
+#[allow(unused)]
+use crate::not_impl::*;
 
 static TEST_MODE: AtomicBool = AtomicBool::new(false);
 static SAVE_IMAGE: AtomicBool = AtomicBool::new(false);
@@ -74,6 +70,7 @@ enum SearchResult {
     NotFound,
 }
 
+#[must_use]
 enum CheckResult {
     NeedProcess,
     // Wait for another check
@@ -345,16 +342,14 @@ fn main() -> anyhow::Result<()> {
             arg!(--"save-image" "Save image each time take"),
             arg!(--"force-distance" "Use distance algorithm to check image"),
         ])
-        .subcommand(Command::new("mouse").about("Display current mouse position"))
-        .subcommand(
+        .subcommands([
+            Command::new("mouse").about("Display current mouse position"),
             Command::new("get-color")
                 .about("Get RGB list from image file")
                 .args(&[
                     arg!(<FILE> ... "Image file"),
                     arg!(--output <OUTPUT> "Output file").default_missing_value("output.rs"),
                 ]),
-        )
-        .subcommand(
             Command::new("distance")
                 .about("Find best color for image file")
                 .args(&[
@@ -364,26 +359,33 @@ fn main() -> anyhow::Result<()> {
                     arg!(--output <output> "Output result to file").default_value("output.txt"),
                 ])
                 .hide(cfg!(feature = "distance")),
-        )
-        .subcommand(
             Command::new("test")
                 .about("Test image is match specify matcher")
                 .args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
-        )
-        .subcommand(
-            Command::new("continue-match")
-                .about("Help subcommand for debug match current screen and output")
-                .args(&[
-                    arg!(<function> "Functions to match")
-                        .value_parser([PossibleValue::new("cs2-lobby")]),
-                    arg!([interval] "Fetch interval(ms)")
-                        .default_value("250")
-                        .value_parser(clap::value_parser!(u64)),
-                    arg!(--save <failed_only> "Save image")
-                        .default_value("false")
-                        .value_parser(clap::value_parser!(bool)),
-                ]),
-        )
+            Command::new("match")
+                .about("Help subcommand for debug matcher")
+                .args(&[arg!(<function> "Functions to match")
+                    .value_parser([PossibleValue::new("cs2-lobby")])])
+                .subcommands(&[
+                    Command::new("screen").about("From screen").args(&[
+                        arg!([interval] "Fetch interval(ms)")
+                            .default_value("250")
+                            .value_parser(clap::value_parser!(u64)),
+                        arg!(--save <failed_only> "Save image")
+                            .default_value("false")
+                            .value_parser(clap::value_parser!(bool)),
+                    ]),
+                    Command::new("dir")
+                        .alias("directory")
+                        .about("about")
+                        .args(&[
+                            arg!(<directory> "Directory to check"),
+                            arg!(--"fail-only" "Display failed only"),
+                        ])
+                        .hide(cfg!(not(feature = "jpeg"))),
+                ])
+                .subcommand_required(true),
+        ])
         .get_matches();
 
     if matches.get_flag("dry-run") {
@@ -413,13 +415,24 @@ fn main() -> anyhow::Result<()> {
             matches.get_flag("5e"),
             force_distance,
         ),
-        Some(("continue-match", matches)) => continue_test_area(
-            matches.get_one::<String>("function").unwrap(),
-            force_distance,
-            matches.get_flag("save"),
-            *matches.get_one("save").unwrap(),
-            *matches.get_one("interval").unwrap(),
-        ),
+        Some(("match", matches)) => {
+            let function = matches.get_one::<String>("function").unwrap();
+            match matches.subcommand() {
+                Some(("screen", matches)) => continue_test_area(
+                    function,
+                    force_distance,
+                    matches.get_flag("save"),
+                    *matches.get_one("save").unwrap(),
+                    *matches.get_one("interval").unwrap(),
+                ),
+                Some(("dir", matches)) => dir_match::test_files(
+                    function,
+                    matches.get_one::<String>("directory").unwrap(),
+                    matches.get_flag("fail-only"),
+                ),
+                _ => unreachable!(),
+            }
+        }
         _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }
 }

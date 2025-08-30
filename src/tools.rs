@@ -122,12 +122,12 @@ pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> an
 }
 
 fn test_area(
-    functions: &str,
+    function: &str,
     force_distance: bool,
     save_image: bool,
     failed_only: bool,
 ) -> anyhow::Result<()> {
-    match functions {
+    match function {
         "cs2-lobby" => {
             let opts = MatchOptions::new(force_distance, 2, 2);
 
@@ -175,14 +175,14 @@ pub(crate) fn get_right_upon_side(monitor: Monitor) -> Point {
 }
 
 pub(crate) fn continue_test_area(
-    functions: &str,
+    function: &str,
     force_distance: bool,
     save_image: bool,
     failed_only: bool,
     interval: u64,
 ) -> anyhow::Result<()> {
     while EXIT_SIGNAL.get().is_none() {
-        test_area(functions, force_distance, save_image, failed_only)?;
+        test_area(function, force_distance, save_image, failed_only)?;
         sleep(Duration::from_millis(interval));
     }
     Ok(())

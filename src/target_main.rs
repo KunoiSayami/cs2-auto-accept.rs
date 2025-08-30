@@ -9,11 +9,10 @@ pub(crate) const MATCH_TEMPLATE: Matcher =
     Matcher::new(true, &[Rgb([52, 182, 81]), Rgb([58, 198, 90])], 20.0);
 pub(crate) const LOBBY_MATCH_TEMPLATE: Matcher = Matcher::new(
     true,
-    &[Rgb([9, 128, 6]), Rgb([4, 128, 4]), Rgb([4, 90, 4])],
-    60.0,
+    &[Rgb([11, 85, 10]), Rgb([4, 90, 4]), Rgb([9, 50, 7])],
+    30.0,
 );
 
-#[must_use]
 pub(crate) fn check_primary_exec(process: &HashMap<Pid, Process>) -> anyhow::Result<CheckResult> {
     if process.values().any(|x| x.name().eq(PROCESS_NAME)) {
         //log::debug!("Check cs2 lobby");
