@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2024"
 
 [build-dependencies]
@@ -9,10 +9,11 @@ embed-resource = "3.0.5"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["cargo"] }
-chrono = "0.4"
+#chrono = { version = "0.4", optional = true }
 ctrlc = "3.4"
 #screenshots = "0.8.10"
 env_logger = "0.11"
+jiff = { version = "0.2", default-features = false, features = ["std"] }
 log = "0.4"
 sysinfo = "0.37.0"
 #tokio = { version = "1", features = ["full"] }
@@ -23,8 +24,8 @@ image = { version = "0.25.6", default-features = false, features = [
     "rayon",
 ] }
 serde = { version = "1", features = ["derive"] }
-threadpool = { version = "1.8", optional = true }
 rayon = "1.11"
+threadpool = { version = "1.8", optional = true }
 
 
 [target.'cfg(not(windows))'.dependencies]
@@ -36,3 +37,9 @@ winsafe = { version = "0.0.25", features = ["user"] }
 [features]
 distance = ["threadpool"]
 jpeg = ["image/jpeg"]
+#non-chrono = ["jiff"]
+
+[profile.release]
+strip = "symbols"
+panic = "abort"
+lto = "fat"

@@ -271,7 +271,10 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                     &target_5e::MATCH_TEMPLATE,
                     options,
                 )?;
-                handle_target(ret)?;
+                if handle_target(ret)? {
+                    sleep_until_exit!(2);
+                    continue;
+                }
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("User is playing     ");
@@ -291,7 +294,10 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                     &target_main::MATCH_TEMPLATE,
                     options,
                 )?;
-                handle_target(ret)?;
+                if handle_target(ret)? {
+                    sleep_until_exit!(2);
+                    continue;
+                }
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("Not searching              ");

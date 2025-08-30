@@ -1,6 +1,5 @@
 use std::{collections::HashSet, fs::OpenOptions, io::Write, thread::sleep, time::Duration};
 
-use chrono::Local;
 use clap::parser::ValuesRef;
 use image::Rgb;
 use xcap::Monitor;
@@ -94,7 +93,7 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
 }
 
 pub(crate) fn timestamp_fmt(fmt: &str) -> String {
-    Local::now().format(fmt).to_string()
+    jiff::Zoned::now().strftime(fmt).to_string()
 }
 
 pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> anyhow::Result<()> {
