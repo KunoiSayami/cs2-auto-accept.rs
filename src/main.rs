@@ -44,6 +44,8 @@ static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 
 const X_LIMIT: usize = 10;
 const Y_LIMIT: usize = 8;
+const X_LIMIT_5E: usize = 26;
+const Y_LIMIT_5E: usize = 10;
 
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
@@ -255,6 +257,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
     );
 
     let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
+    let options_5e = MatchOptions::new(force_distance, X_LIMIT_5E, Y_LIMIT_5E);
 
     log::info!("Starting listening");
 
@@ -269,7 +272,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                     config.e5().into(),
                     true,
                     &target_5e::MATCH_TEMPLATE,
-                    options,
+                    options_5e,
                 )?;
                 if handle_target(ret)? {
                     sleep_until_exit!(config.interval().handle_success());
