@@ -1,4 +1,7 @@
-#![cfg_attr(feature = "gui", windows_subsystem = "windows")]
+#![cfg_attr(
+    all(feature = "gui", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
 
 mod configure;
 mod definitions;
@@ -41,7 +44,7 @@ use crate::matcher::dir_match;
 #[allow(unused)]
 use crate::not_impl::*;
 
-static TEST_MODE: AtomicBool = AtomicBool::new(false);
+static DRY_RUN: AtomicBool = AtomicBool::new(false);
 static SAVE_IMAGE: AtomicBool = AtomicBool::new(false);
 static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 
@@ -240,10 +243,11 @@ fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
     if let SearchResult::Found(pos1, pos2) = result {
         log::debug!("Mouse point: x: {pos1}, y: {pos2}");
         update_status!(pos1, pos2);
+        update_status!("Performance click");
         move_mouse_click(
             pos1 as i32,
             pos2 as i32,
-            TEST_MODE.load(std::sync::atomic::Ordering::Relaxed),
+            DRY_RUN.load(std::sync::atomic::Ordering::Relaxed),
         )?;
 
         return Ok(true);
@@ -265,18 +269,26 @@ fn sleep_until_exit(second: u64) -> bool {
 fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
     let config = Configure::load(config).unwrap_or_default();
     let mut sys = sysinfo::System::new_with_specifics(
-        RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
+        RefreshKind::nothing().with_processes(
+            ProcessRefreshKind::everything()
+                .without_cpu()
+                .without_disk_usage()
+                .without_memory(),
+        ),
     );
 
     let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
     let options_5e = MatchOptions::new(force_distance, X_LIMIT_5E, Y_LIMIT_5E);
+    let mut last_match;
 
     loop {
+        last_match = "N/A";
         sys.refresh_all();
 
         match target_5e::check_need_handle(sys.processes()) {
             CheckResult::NeedProcess => {
                 print_inline!("Match 5e     ");
+                last_match = "5e";
 
                 let ret = check_image_match(
                     config.e5().into(),
@@ -290,7 +302,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 }
             }
             CheckResult::NoNeedProcess => {
-                print_inline!("User is playing     ");
+                print_inline!("[5e] User is playing     ");
                 sleep_until_exit!(config.interval().e5_wait());
                 continue;
             }
@@ -300,6 +312,8 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
         match target_main::check_primary_exec(sys.processes())? {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
+                last_match = "cs";
+
                 //log::debug!("Check cs main");
                 let ret = check_image_match(
                     config.cs2().into(),
@@ -313,18 +327,20 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 }
             }
             CheckResult::NoNeedProcess => {
-                print_inline!("Not searching              ");
+                print_inline!("[cs] Not searching              ");
                 sleep_until_exit!(config.interval().cs2_wait());
                 continue;
             }
             CheckResult::Next => {}
         }
-        //log::debug!("Next tick");
-        print_inline!("Sleep                      ");
-        if !TEST_MODE.load(std::sync::atomic::Ordering::Relaxed) {
-            sleep_until_exit!(config.interval().each());
-        } else {
+
+        print_inline!("[{last_match}] Sleep                      ");
+        if DRY_RUN.load(std::sync::atomic::Ordering::Relaxed) {
             sleep_until_exit!(2);
+        } else if last_match.len() == 3 {
+            sleep_until_exit!(config.interval().long());
+        } else {
+            sleep_until_exit!(config.interval().each());
         }
     }
     log::info!("User exit");
@@ -411,12 +427,11 @@ fn main() -> anyhow::Result<()> {
                         .hide(cfg!(not(feature = "jpeg"))),
                 ])
                 .subcommand_required(true),
-            Command::new("gui"),
         ])
         .get_matches();
 
     if matches.get_flag("dry-run") {
-        TEST_MODE.store(true, std::sync::atomic::Ordering::Relaxed);
+        DRY_RUN.store(true, std::sync::atomic::Ordering::Relaxed);
         log::debug!("Dry running");
     }
 
@@ -460,7 +475,6 @@ fn main() -> anyhow::Result<()> {
                 _ => unreachable!(),
             }
         }
-        Some(("gui", _)) => gui::gui_entry(matches.get_one("CONFIG").unwrap(), force_distance),
-        _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
+        _ => gui::gui_entry(matches.get_one("CONFIG").unwrap(), force_distance),
     }
 }

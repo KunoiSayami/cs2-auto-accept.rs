@@ -25,14 +25,11 @@ macro_rules! update_status {
             .unwrap()
             .log(format!(
                 "{} {}",
-                timestamp_fmt("[%Y-%m-%d %H:%M:%S.%3f]"),
+                timestamp_fmt("%Y-%m-%d %H:%M:%S.%3f"),
                 format!($($arg)*)
             ));
     };
 }
-/*
-#[derive(Helper)]
-#[helper(block)] */
 enum MessageEvent {
     Point(usize, usize),
     Log(String),
@@ -77,7 +74,7 @@ fn handle_event(
                             log_entries.remove(0);
                         }
                         log_entries.push(LogData {
-                            color: Color::from_rgb_u8(0xff, 0, 0),
+                            color: Color::from_rgb_u8(68, 219, 46),
                             text: format!(
                                 "{} x: {x}, y: {y}",
                                 timestamp_fmt("[%Y-%m-%d %H:%M:%S.%3f]")
@@ -116,19 +113,23 @@ pub(crate) fn gui_entry(config: &String, force_distance: bool) -> anyhow::Result
 
     let main_window = MainWindow::new()?;
 
+    main_window.set_save_image(crate::SAVE_IMAGE.load(std::sync::atomic::Ordering::Relaxed));
+    main_window.set_dry_run(crate::DRY_RUN.load(std::sync::atomic::Ordering::Relaxed));
+
+    main_window.on_dry_run_toggle(|state| {
+        crate::DRY_RUN.store(state, std::sync::atomic::Ordering::Relaxed);
+    });
+    main_window.on_save_image_toggle(|state| {
+        crate::SAVE_IMAGE.store(state, std::sync::atomic::Ordering::Relaxed);
+    });
+
     let handler = std::thread::spawn({
         let window = main_window.as_weak();
         move || handle_event(window, receiver)
     });
 
     main_window.run()?;
-    //log::debug!("Finished");
     s.exit();
-    //s.send(MessageEvent::Exit);
-    /* tokio::runtime::Builder::new_current_thread()
-    .build()
-    .unwrap()
-    .block_on(thread)?; */
     handler.join().unwrap()?;
     matcher.join().unwrap()?;
     Ok(())

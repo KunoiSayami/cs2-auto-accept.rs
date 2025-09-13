@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "1.1.0"
+version = "2.0.0"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -20,14 +20,14 @@ jiff = { version = "0.2", default-features = false, features = ["std"] }
 log = "0.4"
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
+slint = { version = "1.13", optional = true }
 sysinfo = "0.37.0"
 threadpool = { version = "1.8", optional = true }
 toml = "0.9"
 xcap = "0.7"
-slint = {version = "1.13", optional = true}
 
 [build-dependencies]
-slint-build = {version = "1.13", optional = true}
+slint-build = { version = "1.13", optional = true }
 
 [target.'cfg(not(windows))'.dependencies]
 enigo = { version = "0.6" }
@@ -36,10 +36,11 @@ enigo = { version = "0.6" }
 winsafe = { version = "0.0.25", features = ["user"] }
 
 [features]
+default = ["gui"]
 distance = ["dep:threadpool"]
 jpeg = ["image/jpeg"]
 #non-chrono = ["jiff"]
-gui = ["dep:slint", "slint-build"]
+gui = ["dep:slint", "dep:slint-build"]
 
 [profile.release]
 strip = "symbols"

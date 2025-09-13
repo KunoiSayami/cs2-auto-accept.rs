@@ -25,7 +25,7 @@ pub(crate) mod gui {
         ($x:expr, $y: expr) => {};
     }
 
-    pub(crate) fn gui_entry(_: &String, _: bool) -> ! {
-        unimplemented!("To use this function, enable \"gui\" feature");
+    pub(crate) fn gui_entry(config: &String, force_distance: bool) -> anyhow::Result<()> {
+        crate::real_main_guarder(config, force_distance)
     }
 }

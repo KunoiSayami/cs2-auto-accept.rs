@@ -10,6 +10,8 @@ pub struct Interval {
     handle_success: u64,
     #[serde(alias = "loop")]
     each: u64,
+    #[serde(alias = "long-sleep")]
+    long: u64,
     #[serde(alias = "cs2-wait", alias = "cs-wait")]
     cs2_wait: u64,
     #[serde(rename = "5e-wait", alias = "5e_wait")]
@@ -32,6 +34,10 @@ impl Interval {
     pub fn e5_wait(&self) -> u64 {
         self.e5_wait
     }
+
+    pub fn long(&self) -> u64 {
+        self.long
+    }
 }
 
 impl Default for Interval {
@@ -41,6 +47,7 @@ impl Default for Interval {
             each: 3,
             cs2_wait: 16,
             e5_wait: 20,
+            long: 10,
         }
     }
 }

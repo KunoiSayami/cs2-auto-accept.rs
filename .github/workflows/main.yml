@@ -25,25 +25,26 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     steps:
       - uses: actions/checkout@v5
+      - name: Get metadata
+        shell: bash
+        run: |
+          cargo metadata --format-version=1 --no-deps | jq '.packages[0].dependencies[] | {name, req}' > dep.lock
       - name: Cache Cargo packages
         id: cache-cargo
         uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-cargo-${{  hashFiles('Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{  hashFiles('dep.lock') }}
           path: |
             ~/.cargo
             ~/.rustup
             $PWD/target
-      - if: ${{ steps.cache-cargo.outputs.cache-hit != 'true' }}
-        name: Update rust
-        run: rustup update
       - name: Build binary
         id: build
         shell: bash
         run: |
-          cargo build --features gui --profile release
-          mv target/release/cs2-auto-accept.exe target/release/$GUI_BINARY_NAME
           cargo build --profile release
+          mv target/release/cs2-auto-accept.exe target/release/$GUI_BINARY_NAME
+          cargo build --no-default-features --profile release
           mv target/release/cs2-auto-accept.exe target/release/$BINARY_NAME
           echo "bin=target/release/$BINARY_NAME" >> $GITHUB_OUTPUT
           echo "bin-name=$BINARY_NAME" >> $GITHUB_OUTPUT

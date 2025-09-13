@@ -1,4 +1,4 @@
-import { ListView, VerticalBox, Button } from "std-widgets.slint";
+import { ListView, VerticalBox, Button, CheckBox } from "std-widgets.slint";
 
 struct LogData {
     text: string,
@@ -7,40 +7,23 @@ struct LogData {
 
 export component MainWindow inherits Window {
     width: 300px;
-    height: 200px;
-    callback click-toggle(bool);
+    height: 250px;
+    callback dry-run-toggle(bool);
+    callback save-image-toggle(bool);
     in property <[LogData]> log_entries: [];
-    /* property <bool> show_image: false;
-    in property <image> image;
-    property <string> status: "<STUB>"; */
+    in-out property <bool> dry-run: false;
+    in-out property <bool> save-image: false;
     in property <string> last_status: "<STUB>";
+    title: "Auto accepter";
     VerticalBox {
-            /* HorizontalLayout {
-                Text {
-                    text: status;
-                    font-size: 20px;
-                }
-
-                btn := Button {
-                    text: "Toggle";
-                    clicked => {
-                        root.show_image = !root.show_image;
-                        root.click-toggle(root.show_image);
-                        if (root.show_image) {
-                            root.status = "Show image: true";
-                        } else {
-                            root.status = "Show image: false";
-                        }
-                    }
-                }
-            } */
-
         Text {
+            height: 15px;
             font-size: 13px;
             text: last_status;
         }
 
         ListView {
+            height: 120px;
             for data in log_entries: Rectangle {
                 height: 12px;
                 width: parent.width;
@@ -49,6 +32,27 @@ export component MainWindow inherits Window {
                     text: data.text;
                     color: data.color;
                 }
+            }
+        }
+
+        CheckBox {
+            text: "Always on top";
+            checked <=> root.always-on-top;
+        }
+
+        CheckBox {
+            text: "Dry run";
+            checked <=> root.dry-run;
+            toggled => {
+                dry-run-toggle(self.checked);
+            }
+        }
+
+        CheckBox {
+            text: "Save image";
+            checked <=> root.save-image;
+            toggled => {
+                save-image-toggle(self.checked);
             }
         }
     }
