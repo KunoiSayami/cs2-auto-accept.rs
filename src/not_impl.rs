@@ -16,3 +16,16 @@ pub(crate) mod dir_match {
         unimplemented!("To use this function, enable \"jpeg\" feature")
     }
 }
+
+#[cfg(not(feature = "gui"))]
+pub(crate) mod gui {
+    #[macro_export]
+    macro_rules! update_status {
+        ($($arg:tt)*) => {};
+        ($x:expr, $y: expr) => {};
+    }
+
+    pub(crate) fn gui_entry(_: &String, _: bool) -> ! {
+        unimplemented!("To use this function, enable \"gui\" feature");
+    }
+}

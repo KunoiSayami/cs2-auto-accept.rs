@@ -1,0 +1,59 @@
+import { ListView, VerticalBox, Button } from "std-widgets.slint";
+
+struct LogData {
+    text: string,
+    color: color,
+}
+
+export component MainWindow inherits Window {
+    width: 300px;
+    height: 200px;
+    callback click-toggle(bool);
+    in property <[LogData]> log_entries: [];
+    /* property <bool> show_image: false;
+    in property <image> image;
+    property <string> status: "<STUB>"; */
+    in property <string> last_status: "<STUB>";
+    VerticalBox {
+            /* HorizontalLayout {
+                Text {
+                    text: status;
+                    font-size: 20px;
+                }
+
+                btn := Button {
+                    text: "Toggle";
+                    clicked => {
+                        root.show_image = !root.show_image;
+                        root.click-toggle(root.show_image);
+                        if (root.show_image) {
+                            root.status = "Show image: true";
+                        } else {
+                            root.status = "Show image: false";
+                        }
+                    }
+                }
+            } */
+
+        Text {
+            font-size: 13px;
+            text: last_status;
+        }
+
+        ListView {
+            for data in log_entries: Rectangle {
+                height: 12px;
+                width: parent.width;
+                Text {
+                    x: 0;
+                    text: data.text;
+                    color: data.color;
+                }
+            }
+        }
+    }
+
+        /* Image {
+            source: image;
+        } */
+}

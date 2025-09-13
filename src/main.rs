@@ -1,5 +1,9 @@
+#![cfg_attr(feature = "gui", windows_subsystem = "windows")]
+
 mod configure;
 mod definitions;
+#[cfg(feature = "gui")]
+mod gui;
 mod matcher;
 mod not_impl;
 mod platform_impl;
@@ -9,7 +13,6 @@ mod tools;
 mod types;
 
 use std::{
-    io::Write,
     sync::{OnceLock, atomic::AtomicBool, mpsc},
     thread::sleep,
     time::{Duration, Instant},
@@ -45,16 +48,24 @@ static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
 const X_LIMIT: usize = 10;
 const Y_LIMIT: usize = 8;
 const X_LIMIT_5E: usize = 26;
-const Y_LIMIT_5E: usize = 10;
+const Y_LIMIT_5E: usize = 12;
 
+#[cfg(not(feature = "gui"))]
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
         print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S.%3f] "));
         print!($($arg)*);
         print!("\r");
         {
-            std::io::stdout().lock().flush().unwrap();
+            std::io::Write::flush(&mut std::io::stdout().lock()).unwrap();
         }
+    }};
+}
+
+#[cfg(feature = "gui")]
+macro_rules! print_inline {
+    ($($arg:tt)*) => {{
+        update_status!($($arg)*);
     }};
 }
 
@@ -228,6 +239,7 @@ fn display_mouse() -> anyhow::Result<()> {
 fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
     if let SearchResult::Found(pos1, pos2) = result {
         log::debug!("Mouse point: x: {pos1}, y: {pos2}");
+        update_status!(pos1, pos2);
         move_mouse_click(
             pos1 as i32,
             pos2 as i32,
@@ -258,8 +270,6 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
 
     let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
     let options_5e = MatchOptions::new(force_distance, X_LIMIT_5E, Y_LIMIT_5E);
-
-    log::info!("Starting listening");
 
     loop {
         sys.refresh_all();
@@ -322,6 +332,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
 }
 
 fn real_main_guarder(config: &String, force_distance: bool) -> anyhow::Result<()> {
+    log::info!("Started checking");
     let mut err = None;
     while EXIT_SIGNAL.get().is_none() {
         if let Err(e) = real_main(config, force_distance)
@@ -339,9 +350,15 @@ fn main() -> anyhow::Result<()> {
         .filter_module("enigo", log::LevelFilter::Warn)
         .init();
     ctrlc::set_handler(|| {
+        #[cfg(not(feature = "gui"))]
         EXIT_SIGNAL
             .set(true)
             .unwrap_or_else(|_| std::process::exit(1));
+        #[cfg(feature = "gui")]
+        {
+            eprintln!("Emergency exit: should performance exit via click close button");
+            std::process::exit(1);
+        }
     })
     .unwrap();
     let matches = clap::command!()
@@ -394,6 +411,7 @@ fn main() -> anyhow::Result<()> {
                         .hide(cfg!(not(feature = "jpeg"))),
                 ])
                 .subcommand_required(true),
+            Command::new("gui"),
         ])
         .get_matches();
 
@@ -442,6 +460,7 @@ fn main() -> anyhow::Result<()> {
                 _ => unreachable!(),
             }
         }
+        Some(("gui", _)) => gui::gui_entry(matches.get_one("CONFIG").unwrap(), force_distance),
         _ => real_main_guarder(matches.get_one("CONFIG").unwrap(), force_distance),
     }
 }

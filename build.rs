@@ -7,6 +7,12 @@ fn build_rc() {
         .unwrap();
 }
 
+fn build_gui() {
+    #[cfg(feature = "gui")]
+    slint_build::compile("ui/main-dialog.slint").unwrap();
+}
+
 fn main() {
     build_rc();
+    build_gui();
 }
