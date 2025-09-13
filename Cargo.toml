@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -40,7 +40,9 @@ default = ["gui"]
 distance = ["dep:threadpool"]
 jpeg = ["image/jpeg"]
 #non-chrono = ["jiff"]
-gui = ["dep:slint", "dep:slint-build"]
+gui-only = ["dep:slint", "dep:slint-build"]
+tz = ["jiff/tzdb-bundle-platform", "jiff/tz-system"]
+gui = ["gui-only", "tz"]
 
 [profile.release]
 strip = "symbols"

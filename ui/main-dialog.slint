@@ -6,7 +6,7 @@ struct LogData {
 }
 
 export component MainWindow inherits Window {
-    width: 300px;
+    width: 330px;
     height: 250px;
     callback dry-run-toggle(bool);
     callback save-image-toggle(bool);
@@ -25,10 +25,11 @@ export component MainWindow inherits Window {
         ListView {
             height: 120px;
             for data in log_entries: Rectangle {
-                height: 12px;
+                height: 14px;
                 width: parent.width;
                 Text {
                     x: 0;
+                    font-size: 13px;
                     text: data.text;
                     color: data.color;
                 }

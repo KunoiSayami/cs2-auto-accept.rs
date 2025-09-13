@@ -17,7 +17,7 @@ pub(crate) mod dir_match {
     }
 }
 
-#[cfg(not(feature = "gui"))]
+#[cfg(not(feature = "gui-only"))]
 pub(crate) mod gui {
     #[macro_export]
     macro_rules! update_status {

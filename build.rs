@@ -8,7 +8,7 @@ fn build_rc() {
 }
 
 fn build_gui() {
-    #[cfg(feature = "gui")]
+    #[cfg(feature = "gui-only")]
     slint_build::compile("ui/main-dialog.slint").unwrap();
 }
 

@@ -28,7 +28,7 @@ jobs:
       - name: Get metadata
         shell: bash
         run: |
-          cargo metadata --format-version=1 --no-deps | jq '.packages[0].dependencies[] | {name, req}' > dep.lock
+          cargo metadata --format-version=1 --no-deps | jq '.packages[0].dependencies[] | {name, req, features}' > dep.lock
       - name: Cache Cargo packages
         id: cache-cargo
         uses: actions/cache@v4

@@ -1,11 +1,11 @@
 #![cfg_attr(
-    all(feature = "gui", not(debug_assertions)),
+    all(feature = "gui-only", not(debug_assertions)),
     windows_subsystem = "windows"
 )]
 
 mod configure;
 mod definitions;
-#[cfg(feature = "gui")]
+#[cfg(feature = "gui-only")]
 mod gui;
 mod matcher;
 mod not_impl;
@@ -53,7 +53,7 @@ const Y_LIMIT: usize = 8;
 const X_LIMIT_5E: usize = 26;
 const Y_LIMIT_5E: usize = 12;
 
-#[cfg(not(feature = "gui"))]
+#[cfg(not(feature = "gui-only"))]
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
         print!("\r{}", timestamp_fmt("[%Y-%m-%d %H:%M:%S.%3f] "));
@@ -65,7 +65,7 @@ macro_rules! print_inline {
     }};
 }
 
-#[cfg(feature = "gui")]
+#[cfg(feature = "gui-only")]
 macro_rules! print_inline {
     ($($arg:tt)*) => {{
         update_status!($($arg)*);
@@ -366,11 +366,11 @@ fn main() -> anyhow::Result<()> {
         .filter_module("enigo", log::LevelFilter::Warn)
         .init();
     ctrlc::set_handler(|| {
-        #[cfg(not(feature = "gui"))]
+        #[cfg(not(feature = "gui-only"))]
         EXIT_SIGNAL
             .set(true)
             .unwrap_or_else(|_| std::process::exit(1));
-        #[cfg(feature = "gui")]
+        #[cfg(feature = "gui-only")]
         {
             eprintln!("Emergency exit: should performance exit via click close button");
             std::process::exit(1);
