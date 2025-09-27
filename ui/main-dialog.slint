@@ -42,7 +42,7 @@ export component MainWindow inherits Window {
         }
 
         CheckBox {
-            text: "Dry run";
+            text: "No click";
             checked <=> root.dry-run;
             toggled => {
                 dry-run-toggle(self.checked);
