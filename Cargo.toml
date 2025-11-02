@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "2.1.1"
+version = "2.1.2"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -10,7 +10,7 @@ embed-resource = "3.0.5"
 anyhow = "1"
 clap = { version = "4", features = ["cargo"] }
 #chrono = { version = "0.4", optional = true }
-ctrlc = "3.4"
+ctrlc = "3.5"
 env_logger = "0.11"
 image = { version = "0.25.6", default-features = false, features = [
     "png",
@@ -20,20 +20,20 @@ jiff = { version = "0.2", default-features = false, features = ["std"] }
 log = "0.4"
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
-slint = { version = "1.13", optional = true }
+slint = { version = "1.14", optional = true }
 sysinfo = "0.37.0"
 threadpool = { version = "1.8", optional = true }
 toml = "0.9"
 xcap = "0.7"
 
 [build-dependencies]
-slint-build = { version = "1.13", optional = true }
+slint-build = { version = "1.14", optional = true }
 
 [target.'cfg(not(windows))'.dependencies]
 enigo = { version = "0.6" }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.25", features = ["user"] }
+winsafe = { version = "0.0.26", features = ["user"] }
 
 [features]
 default = ["gui"]
