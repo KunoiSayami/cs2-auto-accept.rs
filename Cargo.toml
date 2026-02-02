@@ -21,10 +21,10 @@ log = "0.4"
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
 slint = { version = "1.14", optional = true }
-sysinfo = "0.37.0"
+sysinfo = "0.38.0"
 threadpool = { version = "1.8", optional = true }
 toml = "0.9"
-xcap = "0.7"
+xcap = "0.8"
 
 [build-dependencies]
 slint-build = { version = "1.14", optional = true }
@@ -33,7 +33,7 @@ slint-build = { version = "1.14", optional = true }
 enigo = { version = "0.6" }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.26", features = ["user"] }
+winsafe = { version = "0.0.27", features = ["user"] }
 
 [features]
 default = ["gui"]
