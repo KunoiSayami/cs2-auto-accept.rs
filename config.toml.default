@@ -3,3 +3,9 @@ handle-success = 2
 loop = 3
 cs2-wait = 15
 5e-wait = 20
+
+[obs]
+enabled = false
+host = "127.0.0.1"
+port = 4455
+# password = "your-obs-password"

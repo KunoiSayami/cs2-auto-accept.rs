@@ -4,13 +4,17 @@ use serde::Deserialize;
 
 use crate::types::Point;
 
+fn default_long_sleep() -> u64 {
+    10
+}
+
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct Interval {
     #[serde(alias = "after-success", alias = "handle-success")]
     handle_success: u64,
     #[serde(alias = "loop")]
     each: u64,
-    #[serde(alias = "long-sleep")]
+    #[serde(alias = "long-sleep", default = "default_long_sleep")]
     long: u64,
     #[serde(alias = "cs2-wait", alias = "cs-wait")]
     cs2_wait: u64,
@@ -52,13 +56,67 @@ impl Default for Interval {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Default)]
+#[cfg(feature = "obs")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct ObsIntegration {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default = "ObsIntegration::default_host")]
+    host: String,
+    #[serde(default = "ObsIntegration::default_port")]
+    port: u16,
+    password: Option<String>,
+}
+
+#[cfg(feature = "obs")]
+impl ObsIntegration {
+    fn default_host() -> String {
+        "127.0.0.1".to_string()
+    }
+
+    fn default_port() -> u16 {
+        4455
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn host(&self) -> &str {
+        &self.host
+    }
+
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    pub fn password(&self) -> Option<&str> {
+        self.password.as_deref()
+    }
+}
+
+#[cfg(feature = "obs")]
+impl Default for ObsIntegration {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            host: Self::default_host(),
+            port: Self::default_port(),
+            password: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
 pub struct Configure {
     cs2: Option<Point>,
     #[serde(rename = "5e")]
     e5: Option<Point>,
     #[serde(default)]
     interval: Interval,
+    #[cfg(feature = "obs")]
+    #[serde(default)]
+    obs: ObsIntegration,
 }
 
 impl Configure {
@@ -76,5 +134,10 @@ impl Configure {
 
     pub fn interval(&self) -> Interval {
         self.interval
+    }
+
+    #[cfg(feature = "obs")]
+    pub fn obs(&self) -> &ObsIntegration {
+        &self.obs
     }
 }

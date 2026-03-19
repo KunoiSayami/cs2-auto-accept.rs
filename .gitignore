@@ -3,3 +3,4 @@
 output*
 *.patch
 *.jpg
+config.toml

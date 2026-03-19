@@ -9,6 +9,8 @@ mod definitions;
 mod gui;
 mod matcher;
 mod not_impl;
+#[cfg(feature = "obs")]
+mod obs;
 mod platform_impl;
 mod target_5e;
 mod target_main;
@@ -76,6 +78,21 @@ macro_rules! sleep_until_exit {
     ($time:expr) => {
         if sleep_until_exit($time) {
             break;
+        }
+    };
+}
+
+macro_rules! send_obs_command {
+    ($tx:expr) => {
+        if let Some(ref tx) = $tx {
+            tx.send(obs::ObsCmd::EnsureRecording).ok();
+        }
+    };
+    ($tx:expr, $count:expr, $counter:expr) => {
+        $counter += 1;
+        if $counter > $count {
+            $counter = 0;
+            send_obs_command!($tx);
         }
     };
 }
@@ -267,7 +284,9 @@ fn sleep_until_exit(second: u64) -> bool {
 }
 
 fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
-    let config = Configure::load(config).unwrap_or_default();
+    let config = Configure::load(config)
+        .inspect_err(|e| log::warn!("Failed to load config, using defaults: {e:#}"))
+        .unwrap_or_default();
     let mut sys = sysinfo::System::new_with_specifics(
         RefreshKind::nothing().with_processes(
             ProcessRefreshKind::everything()
@@ -280,6 +299,13 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
     let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
     let options_5e = MatchOptions::new(force_distance, X_LIMIT_5E, Y_LIMIT_5E);
     let mut last_match;
+    #[cfg(feature = "obs")]
+    let obs_tx = config
+        .obs()
+        .enabled()
+        .then(|| obs::spawn(config.obs().clone()));
+    #[cfg(feature = "obs")]
+    let mut official_ds = 0;
 
     loop {
         last_match = "N/A";
@@ -303,6 +329,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("[5e] User is playing     ");
+                send_obs_command!(obs_tx);
                 sleep_until_exit!(config.interval().e5_wait());
                 continue;
             }
@@ -313,6 +340,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             CheckResult::NeedProcess => {
                 print_inline!("Match CS2     ");
                 last_match = "cs";
+                send_obs_command!(obs_tx, 5, official_ds);
 
                 //log::debug!("Check cs main");
                 let ret = check_image_match(
@@ -328,6 +356,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
             }
             CheckResult::NoNeedProcess => {
                 print_inline!("[cs] Not searching              ");
+                send_obs_command!(obs_tx, 15, official_ds);
                 sleep_until_exit!(config.interval().cs2_wait());
                 continue;
             }

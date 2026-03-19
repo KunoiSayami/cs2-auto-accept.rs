@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "2.1.3"
+version = "3.0.0"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -8,6 +8,7 @@ embed-resource = "3.0.5"
 
 [dependencies]
 anyhow = "1"
+base64 = { version = "0.22", optional = true }
 clap = { version = "4", features = ["cargo"] }
 #chrono = { version = "0.4", optional = true }
 ctrlc = "3.5"
@@ -20,10 +21,13 @@ jiff = { version = "0.2", default-features = false, features = ["std"] }
 log = "0.4"
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
+sha2 = { version = "0.10", optional = true }
 slint = { version = "1.14", optional = true }
 sysinfo = "0.38"
 threadpool = { version = "1.8", optional = true }
 toml = "1"
+tungstenite = { version = "0.29", optional = true }
 xcap = "0.8"
 
 [build-dependencies]
@@ -43,6 +47,7 @@ jpeg = ["image/jpeg"]
 gui-only = ["dep:slint", "dep:slint-build"]
 tz = ["jiff/tzdb-bundle-platform", "jiff/tz-system"]
 gui = ["gui-only", "tz"]
+obs = ["dep:tungstenite", "dep:serde_json", "dep:sha2", "dep:base64"]
 
 [profile.release]
 strip = "symbols"
