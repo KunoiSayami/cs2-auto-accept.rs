@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -28,7 +28,7 @@ sysinfo = "0.38"
 threadpool = { version = "1.8", optional = true }
 toml = "1"
 tungstenite = { version = "0.29", optional = true }
-xcap = "0.8"
+xcap = "0.9"
 
 [build-dependencies]
 slint-build = { version = "1.14", optional = true }

@@ -82,6 +82,12 @@ macro_rules! sleep_until_exit {
     };
 }
 
+#[cfg(not(feature = "obs"))]
+macro_rules! send_obs_command {
+    ($($arg:tt)*) => {};
+}
+
+#[cfg(feature = "obs")]
 macro_rules! send_obs_command {
     ($tx:expr) => {
         if let Some(ref tx) = $tx {

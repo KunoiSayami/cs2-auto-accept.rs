@@ -109,7 +109,7 @@ fn ensure_recording(ws: &mut Ws) -> anyhow::Result<()> {
         .unwrap_or(false);
 
     if output_active {
-        log::info!("OBS already recording");
+        //log::info!("OBS already recording");
         return Ok(());
     }
 
