@@ -107,11 +107,20 @@ impl Default for ObsIntegration {
     }
 }
 
+fn default_5e_title() -> String {
+    String::from_utf8(vec![
+        53, 69, 229, 175, 185, 230, 136, 152, 229, 185, 179, 229, 143, 176,
+    ])
+    .unwrap()
+}
+
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct Configure {
     cs2: Option<Point>,
     #[serde(rename = "5e")]
     e5: Option<Point>,
+    #[serde(rename = "5e-title", default = "default_5e_title")]
+    e5_title: String,
     #[serde(default)]
     interval: Interval,
     #[cfg(feature = "obs")]
@@ -139,5 +148,9 @@ impl Configure {
     #[cfg(feature = "obs")]
     pub fn obs(&self) -> &ObsIntegration {
         &self.obs
+    }
+
+    pub fn e5_title(&self) -> &str {
+        &self.e5_title
     }
 }

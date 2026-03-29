@@ -8,6 +8,20 @@ use crate::{
     matcher::Matcher,
 };
 
+#[cfg(windows)]
+pub(crate) fn is_5e_foreground(title: &str) -> bool {
+    use winsafe::HWND;
+    HWND::GetForegroundWindow()
+        .and_then(|hwnd| hwnd.GetWindowText().ok())
+        .map(|t| t.contains(title))
+        .unwrap_or(false)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn is_5e_foreground() -> bool {
+    false
+}
+
 pub const MATCH_TEMPLATE: Matcher = Matcher::new(true, &[Rgb([72, 180, 30])], 90.0);
 
 pub(crate) fn check_need_handle(process: &HashMap<Pid, Process>) -> CheckResult {

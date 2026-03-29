@@ -322,6 +322,12 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 print_inline!("Match 5e     ");
                 last_match = "5e";
 
+                if !target_5e::is_5e_foreground(config.e5_title()) {
+                    print_inline!("[5e] Not foreground     ");
+                    sleep_until_exit!(config.interval().handle_success());
+                    continue;
+                }
+
                 let ret = check_image_match(
                     config.e5().into(),
                     true,
