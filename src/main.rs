@@ -405,6 +405,7 @@ fn main() -> anyhow::Result<()> {
     env_logger::Builder::new()
         .filter_level(log::LevelFilter::Debug)
         .filter_module("enigo", log::LevelFilter::Warn)
+        .filter_module("tungstenite", log::LevelFilter::Warn)
         .init();
     ctrlc::set_handler(|| {
         #[cfg(not(feature = "gui-only"))]

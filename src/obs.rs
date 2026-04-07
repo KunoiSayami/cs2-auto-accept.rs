@@ -43,6 +43,16 @@ fn read_msg(ws: &mut Ws) -> anyhow::Result<serde_json::Value> {
     }
 }
 
+fn read_response(ws: &mut Ws) -> anyhow::Result<serde_json::Value> {
+    loop {
+        let msg = read_msg(ws)?;
+        if msg["op"].as_u64() == Some(OP_REQUEST_RESPONSE) {
+            return Ok(msg);
+        }
+        //log::debug!("OBS: skipping op={} message", msg["op"]);
+    }
+}
+
 fn send_msg(ws: &mut Ws, value: serde_json::Value) -> anyhow::Result<()> {
     ws.send(tungstenite::Message::Text(value.to_string().into()))?;
     Ok(())
@@ -88,6 +98,56 @@ fn handshake(config: &ObsIntegration) -> anyhow::Result<Ws> {
     Ok(ws)
 }
 
+fn ensure_scene(ws: &mut Ws, scene: &str) -> anyhow::Result<()> {
+    send_msg(
+        ws,
+        serde_json::json!({
+            "op": OP_REQUEST,
+            "d": { "requestType": "GetCurrentProgramScene", "requestId": "get-scene" }
+        }),
+    )
+    .context("sending GetCurrentProgramScene")?;
+
+    let resp = read_response(ws).context("reading GetCurrentProgramScene response")?;
+
+    let current = resp["d"]["responseData"]["currentProgramSceneName"]
+        .as_str()
+        .unwrap_or("");
+
+    if current == scene {
+        return Ok(());
+    }
+
+    log::info!("OBS scene mismatch (current={current:?}) — switching to {scene:?}");
+    send_msg(
+        ws,
+        serde_json::json!({
+            "op": OP_REQUEST,
+            "d": {
+                "requestType": "SetCurrentProgramScene",
+                "requestId": "set-scene",
+                "requestData": { "sceneName": scene }
+            }
+        }),
+    )
+    .context("sending SetCurrentProgramScene")?;
+
+    let resp = read_response(ws).context("reading SetCurrentProgramScene response")?;
+    log::debug!("SetCurrentProgramScene response: {resp}");
+    if !resp["d"]["requestStatus"]["result"]
+        .as_bool()
+        .unwrap_or(false)
+    {
+        let code = resp["d"]["requestStatus"]["code"].as_u64().unwrap_or(0);
+        let comment = resp["d"]["requestStatus"]["comment"]
+            .as_str()
+            .unwrap_or("(no comment)");
+        log::warn!("OBS SetCurrentProgramScene failed: code={code} {comment}");
+    }
+
+    Ok(())
+}
+
 fn ensure_recording(ws: &mut Ws) -> anyhow::Result<()> {
     // GetRecordStatus
     send_msg(
@@ -99,10 +159,7 @@ fn ensure_recording(ws: &mut Ws) -> anyhow::Result<()> {
     )
     .context("sending GetRecordStatus")?;
 
-    let resp = read_msg(ws).context("reading GetRecordStatus response")?;
-    if resp["op"].as_u64() != Some(OP_REQUEST_RESPONSE) {
-        bail!("expected RequestResponse, got: {resp}");
-    }
+    let resp = read_response(ws).context("reading GetRecordStatus response")?;
 
     let output_active = resp["d"]["responseData"]["outputActive"]
         .as_bool()
@@ -124,13 +181,11 @@ fn ensure_recording(ws: &mut Ws) -> anyhow::Result<()> {
     )
     .context("sending StartRecord")?;
 
-    let resp = read_msg(ws).context("reading StartRecord response")?;
-    if resp["d"]["requestStatus"]["result"]
+    let resp = read_response(ws).context("reading StartRecord response")?;
+    if !resp["d"]["requestStatus"]["result"]
         .as_bool()
         .unwrap_or(false)
     {
-        log::info!("OBS recording started");
-    } else {
         let comment = resp["d"]["requestStatus"]["comment"]
             .as_str()
             .unwrap_or("unknown error");
@@ -150,7 +205,7 @@ fn obs_thread(config: ObsIntegration, rx: mpsc::Receiver<ObsCmd>) {
                 if ws.is_none() {
                     match handshake(&config) {
                         Ok(conn) => {
-                            log::info!("OBS WebSocket connected");
+                            //log::info!("OBS WebSocket connected");
                             ws = Some(conn);
                         }
                         Err(e) => {
@@ -161,6 +216,13 @@ fn obs_thread(config: ObsIntegration, rx: mpsc::Receiver<ObsCmd>) {
                 }
 
                 if let Some(conn) = ws.as_mut() {
+                    if let Some(scene) = config.scene() {
+                        if let Err(e) = ensure_scene(conn, scene) {
+                            log::warn!("OBS ensure_scene failed: {e:#}");
+                            ws = None;
+                            continue;
+                        }
+                    }
                     if let Err(e) = ensure_recording(conn) {
                         log::warn!("OBS ensure_recording failed: {e:#}");
                         ws = None; // drop broken connection, reconnect next time
@@ -179,7 +241,7 @@ fn obs_thread(config: ObsIntegration, rx: mpsc::Receiver<ObsCmd>) {
 /// Spawn the OBS worker thread. Returns a sender to control it.
 /// The thread exits automatically when the sender is dropped.
 pub fn spawn(config: ObsIntegration) -> mpsc::Sender<ObsCmd> {
-    log::info!("Starting obs thread");
+    //log::info!("Starting obs thread");
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
         .name("obs-worker".into())

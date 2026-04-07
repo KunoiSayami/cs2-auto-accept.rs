@@ -66,6 +66,7 @@ pub struct ObsIntegration {
     #[serde(default = "ObsIntegration::default_port")]
     port: u16,
     password: Option<String>,
+    scene: Option<String>,
 }
 
 #[cfg(feature = "obs")]
@@ -93,6 +94,10 @@ impl ObsIntegration {
     pub fn password(&self) -> Option<&str> {
         self.password.as_deref()
     }
+
+    pub fn scene(&self) -> Option<&str> {
+        self.scene.as_deref()
+    }
 }
 
 #[cfg(feature = "obs")]
@@ -103,6 +108,7 @@ impl Default for ObsIntegration {
             host: Self::default_host(),
             port: Self::default_port(),
             password: None,
+            scene: None,
         }
     }
 }
