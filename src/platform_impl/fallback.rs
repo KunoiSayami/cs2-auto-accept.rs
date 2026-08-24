@@ -15,6 +15,14 @@ pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<
     Ok(())
 }
 
+pub(crate) fn is_autostart_enabled() -> bool {
+    false
+}
+
+pub(crate) fn set_autostart_enabled(_enabled: bool) -> anyhow::Result<()> {
+    Err(anyhow::anyhow!("Autostart is only supported on Windows"))
+}
+
 pub(crate) fn get_pos() -> anyhow::Result<()> {
     let eg = enigo::Enigo::new(&enigo::Settings::default())?;
     let mut prev_x = 0;

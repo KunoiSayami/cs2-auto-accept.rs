@@ -1,6 +1,46 @@
 use std::{thread::sleep, time::Duration};
 
-use winsafe::{GetCursorPos, HwKbMouse, MOUSEINPUT, SendInput, SetCursorPos, co::MOUSEEVENTF};
+use winsafe::{
+    GetCursorPos, HwKbMouse, MOUSEINPUT, RegistryValue, SendInput, SetCursorPos, co::MOUSEEVENTF,
+    co::REG_OPTION, co::RRF,
+};
+
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const VALUE_NAME: &str = "CS2AutoAccept";
+
+pub(crate) fn is_autostart_enabled() -> bool {
+    winsafe::HKEY::CURRENT_USER
+        .RegGetValue(Some(RUN_KEY), Some(VALUE_NAME), RRF::RT_REG_SZ)
+        .is_ok()
+}
+
+pub(crate) fn set_autostart_enabled(enabled: bool) -> anyhow::Result<()> {
+    if enabled {
+        let exe_path = std::env::current_exe()?;
+        let (hkey, _) = winsafe::HKEY::CURRENT_USER.RegCreateKeyEx(
+            RUN_KEY,
+            None,
+            REG_OPTION::default(),
+            winsafe::co::KEY::ALL_ACCESS,
+            None,
+        )?;
+        hkey.RegSetValueEx(
+            Some(VALUE_NAME),
+            RegistryValue::Sz(format!("\"{}\"", exe_path.display())),
+        )?;
+    } else {
+        let hkey = winsafe::HKEY::CURRENT_USER.RegOpenKeyEx(
+            Some(RUN_KEY),
+            REG_OPTION::default(),
+            winsafe::co::KEY::ALL_ACCESS,
+        )?;
+        match hkey.RegDeleteValue(Some(VALUE_NAME)) {
+            Ok(()) | Err(winsafe::co::ERROR::FILE_NOT_FOUND) => {}
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(())
+}
 
 pub(crate) fn move_mouse_click(x: i32, y: i32, is_test: bool) -> anyhow::Result<()> {
     SetCursorPos(x, y)?;

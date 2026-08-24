@@ -7,12 +7,14 @@ struct LogData {
 
 export component MainWindow inherits Window {
     width: 330px;
-    height: 250px;
+    height: 280px;
     callback dry-run-toggle(bool);
     callback save-image-toggle(bool);
+    callback autostart-toggle(bool);
     in property <[LogData]> log_entries: [];
     in-out property <bool> dry-run: false;
     in-out property <bool> save-image: false;
+    in-out property <bool> autostart: false;
     in property <string> last_status: "<STUB>";
     title: "Auto accepter";
     VerticalBox {
@@ -54,6 +56,14 @@ export component MainWindow inherits Window {
             checked <=> root.save-image;
             toggled => {
                 save-image-toggle(self.checked);
+            }
+        }
+
+        CheckBox {
+            text: "Run at Windows startup";
+            checked <=> root.autostart;
+            toggled => {
+                autostart-toggle(self.checked);
             }
         }
     }

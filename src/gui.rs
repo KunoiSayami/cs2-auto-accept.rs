@@ -115,12 +115,18 @@ pub(crate) fn gui_entry(config: &String, force_distance: bool) -> anyhow::Result
 
     main_window.set_save_image(crate::SAVE_IMAGE.load(std::sync::atomic::Ordering::Relaxed));
     main_window.set_dry_run(crate::DRY_RUN.load(std::sync::atomic::Ordering::Relaxed));
+    main_window.set_autostart(crate::platform_impl::is_autostart_enabled());
 
     main_window.on_dry_run_toggle(|state| {
         crate::DRY_RUN.store(state, std::sync::atomic::Ordering::Relaxed);
     });
     main_window.on_save_image_toggle(|state| {
         crate::SAVE_IMAGE.store(state, std::sync::atomic::Ordering::Relaxed);
+    });
+    main_window.on_autostart_toggle(|state| {
+        if let Err(e) = crate::platform_impl::set_autostart_enabled(state) {
+            log::error!("Failed to update autostart setting: {e:#}");
+        }
     });
 
     let handler = std::thread::spawn({

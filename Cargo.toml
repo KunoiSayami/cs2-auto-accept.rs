@@ -37,7 +37,7 @@ slint-build = { version = "1.14", optional = true }
 enigo = { version = "0.6" }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.27", features = ["user"] }
+winsafe = { version = "0.0.27", features = ["user", "advapi"] }
 
 [features]
 default = ["gui"]
