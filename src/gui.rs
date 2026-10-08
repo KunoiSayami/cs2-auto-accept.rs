@@ -84,12 +84,12 @@ fn handle_event(
                         let model = std::rc::Rc::new(slint::VecModel::from(log_entries));
                         w.set_log_entries(model.clone().into());
                     })
-                    .unwrap();
+                    .ok();
             }
             MessageEvent::Log(s) => {
                 window
                     .upgrade_in_event_loop(move |w| w.set_last_status(s.into()))
-                    .unwrap();
+                    .ok();
             }
             MessageEvent::Exit => break,
         };

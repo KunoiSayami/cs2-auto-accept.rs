@@ -42,7 +42,7 @@ winsafe = { version = "0.0.27", features = ["user", "advapi"] }
 [features]
 default = ["gui"]
 distance = ["dep:threadpool"]
-jpeg = ["image/jpeg"]
+jpeg = ["image/jpeg", "dep:threadpool"]
 #non-chrono = ["jiff"]
 gui-only = ["dep:slint", "dep:slint-build"]
 tz = ["jiff/tzdb-bundle-platform", "jiff/tz-system"]

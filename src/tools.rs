@@ -99,7 +99,11 @@ pub(crate) fn timestamp_fmt(fmt: &str) -> String {
 pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> anyhow::Result<()> {
     let image = image::ImageReader::open(file)?.decode()?.into_rgb8();
 
-    let opts = MatchOptions::new(force_distance, crate::X_LIMIT, crate::Y_LIMIT);
+    let opts = if is_5e {
+        MatchOptions::new(force_distance, crate::X_LIMIT_5E, crate::Y_LIMIT_5E)
+    } else {
+        MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT)
+    };
 
     let (buff, count) = process_area(
         &image,
@@ -110,7 +114,7 @@ pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> an
         },
         opts,
     );
-    if count < X_LIMIT * Y_LIMIT {
+    if count < opts.limit_x() * opts.limit_y() {
         println!("Early exit {count}");
         return Ok(());
     }

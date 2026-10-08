@@ -1,8 +1,24 @@
-use std::fs::read_to_string;
+use std::{fs::read_to_string, path::Path};
 
 use serde::Deserialize;
 
 use crate::types::Point;
+
+/// Resolve a relative config path that does not exist in the current directory
+/// against the executable's directory (e.g. when launched at Windows startup,
+/// the working directory is not the program directory).
+pub fn resolve_config_path(path: &str) -> String {
+    let p = Path::new(path);
+    if p.is_absolute() || p.exists() {
+        return path.to_string();
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join(p)))
+        .filter(|candidate| candidate.exists())
+        .map(|candidate| candidate.display().to_string())
+        .unwrap_or_else(|| path.to_string())
+}
 
 fn default_long_sleep() -> u64 {
     10

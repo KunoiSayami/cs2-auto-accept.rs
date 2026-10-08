@@ -396,6 +396,7 @@ fn real_main_guarder(config: &String, force_distance: bool) -> anyhow::Result<()
             .inspect_err(|e| log::error!("Main thread error: {e:?}"))
         {
             err.replace(e);
+            sleep_until_exit(5);
         }
     }
     if let Some(e) = err { Err(e) } else { Ok(()) }
@@ -442,7 +443,7 @@ fn main() -> anyhow::Result<()> {
                     arg!(--"read-only" "No write, just read"),
                     arg!(--output <output> "Output result to file").default_value("output.txt"),
                 ])
-                .hide(cfg!(feature = "distance")),
+                .hide(cfg!(not(feature = "distance"))),
             Command::new("test")
                 .about("Test image is match specify matcher")
                 .args(&[arg!(<FILE> "Test image"), arg!(--"5e" "Enable 5e match")]),
@@ -455,9 +456,8 @@ fn main() -> anyhow::Result<()> {
                         arg!([interval] "Fetch interval(ms)")
                             .default_value("250")
                             .value_parser(clap::value_parser!(u64)),
-                        arg!(--save <failed_only> "Save image")
-                            .default_value("false")
-                            .value_parser(clap::value_parser!(bool)),
+                        arg!(--save "Save image"),
+                        arg!(--"fail-only" "Save failed image only (requires --save)"),
                     ]),
                     Command::new("dir")
                         .alias("directory")
@@ -506,7 +506,7 @@ fn main() -> anyhow::Result<()> {
                     function,
                     force_distance,
                     matches.get_flag("save"),
-                    *matches.get_one("save").unwrap(),
+                    matches.get_flag("fail-only"),
                     *matches.get_one("interval").unwrap(),
                 ),
                 Some(("dir", matches)) => dir_match::test_files(
@@ -517,6 +517,9 @@ fn main() -> anyhow::Result<()> {
                 _ => unreachable!(),
             }
         }
-        _ => gui::gui_entry(matches.get_one("CONFIG").unwrap(), force_distance),
+        _ => gui::gui_entry(
+            &configure::resolve_config_path(matches.get_one::<String>("CONFIG").unwrap()),
+            force_distance,
+        ),
     }
 }
