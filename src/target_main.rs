@@ -3,10 +3,21 @@ use std::collections::HashMap;
 use image::Rgb;
 use sysinfo::{Pid, Process};
 
-use crate::{CheckResult, definitions::PROCESS_NAME, matcher::Matcher, types::MatchOptions};
+use crate::{
+    CheckResult,
+    definitions::PROCESS_NAME,
+    matcher::{Matcher, Shape},
+    types::MatchOptions,
+};
 
-pub(crate) const MATCH_TEMPLATE: Matcher =
-    Matcher::new(true, &[Rgb([52, 182, 81]), Rgb([58, 198, 90])], 20.0);
+/// The accept button measured 197x93 (aspect ~2.1); fill is ~0.85 normally and
+/// ~0.69 while hovered (glowing text covers the green).
+pub(crate) const MATCH_TEMPLATE: Matcher = Matcher::new(
+    true,
+    &[Rgb([52, 182, 81]), Rgb([58, 198, 90])],
+    20.0,
+)
+.with_shape(Shape::new(80, 40, (1.6, 2.8), 0.55));
 pub(crate) const LOBBY_MATCH_TEMPLATE: Matcher = Matcher::new(
     true,
     &[Rgb([11, 85, 10]), Rgb([4, 90, 4]), Rgb([9, 50, 7])],

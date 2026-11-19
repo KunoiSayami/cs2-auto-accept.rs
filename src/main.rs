@@ -32,7 +32,7 @@ use tools::{continue_test_area, load_and_display, test_image, timestamp_fmt};
 use xcap::Monitor;
 
 use crate::{
-    matcher::Matcher,
+    matcher::{Matcher, Region, Shape},
     platform_impl::{get_pos, move_mouse_click},
     types::{MatchOptions, Point, PointOption},
 };
@@ -205,16 +205,22 @@ fn match_algorithm(
     buff: &[Vec<bool>],
     (pic_x, pic_y): (u32, u32),
     options: MatchOptions,
+    shape: Option<&Shape>,
 ) -> SearchResult {
     let x_start = options.limit_x() / 2;
     let x_end = pic_x as usize - x_start;
     let y_start = options.limit_y() / 2;
     let y_end = pic_y as usize - y_start;
+    // Pixels of regions already checked against `shape`
+    let mut visited = vec![vec![false; pic_y as usize]; pic_x as usize];
 
     for x in x_start..x_end {
         for y in y_start..y_end {
             let original_x = x - x_start;
             let original_y = y - y_start;
+            if visited[original_x][original_y] {
+                continue;
+            }
             let mut r = true;
             //let mut matched = 0;
             'outer: for buff in buff.iter().skip(original_x).take(options.limit_x()) {
@@ -229,9 +235,18 @@ fn match_algorithm(
                     //matched += 1;
                 }
             }
-            if r {
-                return SearchResult::Found(x + point.x() as usize, y + point.y() as usize);
+            if !r {
+                continue;
             }
+            let Some(shape) = shape else {
+                return SearchResult::Found(x + point.x() as usize, y + point.y() as usize);
+            };
+            let region = Region::flood_fill(buff, original_x, original_y, &mut visited);
+            if shape.accepts(&region) {
+                let (cx, cy) = region.center();
+                return SearchResult::Found(cx + point.x() as usize, cy + point.y() as usize);
+            }
+            log::trace!("Shape rejected: {region:?}");
         }
     }
     SearchResult::NotFound
@@ -253,7 +268,13 @@ pub(crate) fn check_image_match(
     }
     print_inline!("Checking point of interest");
     //let instant = Instant::now();
-    let ret = match_algorithm(point, &buff, current_screen.dimensions(), options);
+    let ret = match_algorithm(
+        point,
+        &buff,
+        current_screen.dimensions(),
+        options,
+        template.shape(),
+    );
     //log::debug!("elapsed: {:?}", instant.elapsed());
     Ok(ret)
 }

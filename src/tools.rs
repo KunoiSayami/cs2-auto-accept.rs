@@ -105,21 +105,24 @@ pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> an
         MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT)
     };
 
-    let (buff, count) = process_area(
-        &image,
-        if is_5e {
-            &crate::target_5e::MATCH_TEMPLATE
-        } else {
-            &crate::target_main::MATCH_TEMPLATE
-        },
-        opts,
-    );
+    let template = if is_5e {
+        &crate::target_5e::MATCH_TEMPLATE
+    } else {
+        &crate::target_main::MATCH_TEMPLATE
+    };
+    let (buff, count) = process_area(&image, template, opts);
     if count < opts.limit_x() * opts.limit_y() {
         println!("Early exit {count}");
         return Ok(());
     }
     let (x, y) = image.dimensions();
-    let ret = match_algorithm(Point::new(0, 0, x as i32, y as i32), &buff, (x, y), opts);
+    let ret = match_algorithm(
+        Point::new(0, 0, x as i32, y as i32),
+        &buff,
+        (x, y),
+        opts,
+        template.shape(),
+    );
     println!("{ret:?}");
     Ok(())
 }
@@ -141,7 +144,13 @@ fn test_area(
             let early = count < 2 * 2;
 
             let ret = if !early {
-                match match_algorithm(point, &buff, area.dimensions(), opts) {
+                match match_algorithm(
+                    point,
+                    &buff,
+                    area.dimensions(),
+                    opts,
+                    crate::target_main::LOBBY_MATCH_TEMPLATE.shape(),
+                ) {
                     crate::SearchResult::Found(x, y) => {
                         log::debug!("true {x} {y}");
                         true
