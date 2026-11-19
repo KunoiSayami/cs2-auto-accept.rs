@@ -1,6 +1,6 @@
 [package]
 name = "cs2-auto-accept"
-version = "3.3.0"
+version = "4.0.0"
 edition = "2024"
 
 [target.'cfg(windows)'.build-dependencies]
@@ -8,7 +8,7 @@ embed-resource = "3.0.5"
 
 [dependencies]
 anyhow = "1"
-base64 = { version = "0.22", optional = true }
+base64 = { version = "0.23", optional = true }
 clap = { version = "4", features = ["cargo"] }
 #chrono = { version = "0.4", optional = true }
 ctrlc = "3.5"
@@ -17,17 +17,17 @@ image = { version = "0.25.6", default-features = false, features = [
     "png",
     "rayon",
 ] }
-jiff = { version = "0.2", default-features = false, features = ["std"] }
+jiff = { version = "1", default-features = false, features = ["std"] }
 log = "0.4"
 rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 sha2 = { version = "0.11", optional = true }
 slint = { version = "1.14", optional = true }
-sysinfo = "0.38"
+sysinfo = "0.40"
 threadpool = { version = "1.8", optional = true }
 toml = "1"
-tungstenite = { version = "0.29", optional = true }
+tungstenite = { version = "0.30", optional = true }
 xcap = "0.9"
 
 [build-dependencies]
@@ -37,7 +37,7 @@ slint-build = { version = "1.14", optional = true }
 enigo = { version = "0.6" }
 
 [target.'cfg(windows)'.dependencies]
-winsafe = { version = "0.0.27", features = ["user", "advapi"] }
+winsafe = { version = "0.0.29", features = ["user", "advapi"] }
 
 [features]
 default = ["gui"]

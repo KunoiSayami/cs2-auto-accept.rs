@@ -93,7 +93,7 @@ pub fn load_and_display(p: &ValuesRef<String>, output_file: Option<&String>) -> 
 }
 
 pub(crate) fn timestamp_fmt(fmt: &str) -> String {
-    jiff::Zoned::now().strftime(fmt).to_string()
+    jiff::ZonedDateTime::now().strftime(fmt).to_string()
 }
 
 pub(crate) fn test_image(file: &String, is_5e: bool, force_distance: bool) -> anyhow::Result<()> {

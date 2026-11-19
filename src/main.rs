@@ -353,7 +353,7 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
                 .without_disk_usage()
                 .without_memory(),
         ),
-    );
+    )?;
 
     let options = MatchOptions::new(force_distance, X_LIMIT, Y_LIMIT);
     let options_5e = MatchOptions::new(force_distance, X_LIMIT_5E, Y_LIMIT_5E);
