@@ -113,6 +113,7 @@ pub(crate) fn gui_entry(config: &String, force_distance: bool) -> anyhow::Result
 
     let main_window = MainWindow::new()?;
 
+    main_window.set_version(env!("CARGO_PKG_VERSION").into());
     main_window.set_save_image(crate::SAVE_IMAGE.load(std::sync::atomic::Ordering::Relaxed));
     main_window.set_dry_run(crate::DRY_RUN.load(std::sync::atomic::Ordering::Relaxed));
     main_window.set_autostart(crate::platform_impl::is_autostart_enabled());

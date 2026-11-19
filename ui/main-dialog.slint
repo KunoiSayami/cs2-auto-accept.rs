@@ -19,7 +19,8 @@ export component MainWindow inherits Window {
     in-out property <bool> paused: false;
     in property <int> pause-remaining: 0;
     in property <string> last_status: "<STUB>";
-    title: "Auto accepter";
+    in property <string> version: "";
+    title: version == "" ? "Auto accepter" : "Auto accepter v\{version}";
     VerticalBox {
         Text {
             height: 15px;
