@@ -18,7 +18,7 @@ mod tools;
 mod types;
 
 use std::{
-    sync::{OnceLock, atomic::AtomicBool, mpsc},
+    sync::{Mutex, OnceLock, atomic::AtomicBool, mpsc},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -49,6 +49,10 @@ use crate::not_impl::*;
 static DRY_RUN: AtomicBool = AtomicBool::new(false);
 static SAVE_IMAGE: AtomicBool = AtomicBool::new(false);
 static EXIT_SIGNAL: OnceLock<bool> = OnceLock::new();
+/// Matching is paused until this instant (`None` means running)
+static PAUSE_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
+
+const PAUSE_DURATION: Duration = Duration::from_secs(60);
 
 const X_LIMIT: usize = 10;
 const Y_LIMIT: usize = 8;
@@ -285,6 +289,10 @@ fn display_mouse() -> anyhow::Result<()> {
 
 fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
     if let SearchResult::Found(pos1, pos2) = result {
+        if pause_remaining().is_some() {
+            log::debug!("Paused, skip click");
+            return Ok(false);
+        }
         log::debug!("Mouse point: x: {pos1}, y: {pos2}");
         update_status!(pos1, pos2);
         update_status!("Performance click");
@@ -298,6 +306,30 @@ fn handle_target(result: SearchResult) -> anyhow::Result<bool> {
     }
 
     Ok(false)
+}
+
+pub(crate) fn pause_matching() {
+    *PAUSE_UNTIL.lock().unwrap() = Some(Instant::now() + PAUSE_DURATION);
+    log::info!("Matching paused for {PAUSE_DURATION:?}");
+}
+
+pub(crate) fn resume_matching() {
+    if PAUSE_UNTIL.lock().unwrap().take().is_some() {
+        log::info!("Matching resumed");
+    }
+}
+
+/// Remaining pause time, or `None` if not paused (auto clears once expired)
+pub(crate) fn pause_remaining() -> Option<Duration> {
+    let mut guard = PAUSE_UNTIL.lock().unwrap();
+    let remaining = guard.map(|until| until.saturating_duration_since(Instant::now()));
+    match remaining {
+        Some(r) if !r.is_zero() => Some(r),
+        _ => {
+            guard.take();
+            None
+        }
+    }
 }
 
 fn sleep_until_exit(second: u64) -> bool {
@@ -336,6 +368,12 @@ fn real_main(config: &String, force_distance: bool) -> anyhow::Result<()> {
 
     loop {
         last_match = "N/A";
+        if let Some(remaining) = pause_remaining() {
+            let secs = remaining.as_secs() + 1;
+            print_inline!("Paused, resume in {secs}s     ");
+            sleep_until_exit!(1);
+            continue;
+        }
         sys.refresh_all();
 
         match target_5e::check_need_handle(sys.processes()) {

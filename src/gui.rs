@@ -129,6 +129,36 @@ pub(crate) fn gui_entry(config: &String, force_distance: bool) -> anyhow::Result
         }
     });
 
+    main_window.on_pause_toggle(|state| {
+        if state {
+            crate::pause_matching();
+        } else {
+            crate::resume_matching();
+        }
+    });
+
+    // Keep the button in sync with the pause state, so it flips back after auto resume
+    let pause_timer = slint::Timer::default();
+    pause_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(500),
+        {
+            let window = main_window.as_weak();
+            move || {
+                let Some(w) = window.upgrade() else {
+                    return;
+                };
+                match crate::pause_remaining() {
+                    Some(remaining) => {
+                        w.set_paused(true);
+                        w.set_pause_remaining(remaining.as_secs() as i32 + 1);
+                    }
+                    None => w.set_paused(false),
+                }
+            }
+        },
+    );
+
     let handler = std::thread::spawn({
         let window = main_window.as_weak();
         move || handle_event(window, receiver)
